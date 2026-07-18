@@ -20,7 +20,8 @@
  --bad:#dc2626;--badbg:#fef2f2;
  --shadow:0 1px 3px rgba(0,0,0,.05),0 10px 40px rgba(0,0,0,.08);
  --shadow2:0 1px 3px rgba(0,0,0,.05),0 20px 60px rgba(0,0,0,.15);
- --navbg:rgba(255,255,255,.85)}
+ --navbg:rgba(255,255,255,.85);
+ --cSpy:#6b7280;--cSmh:#8b5cf6;--cBook:#16a34a}
 html[data-theme=dark]{
  --bg1:#111827;--bg2:#030712;--card:rgba(31,41,55,.92);--tile:rgba(31,41,55,.5);
  --tileline:#374151;--ink:#f3f4f6;--ink2:#9ca3af;--muted:#6b7280;--line:#374151;
@@ -29,7 +30,8 @@ html[data-theme=dark]{
  --bad:#f87171;--badbg:rgba(127,29,29,.3);
  --shadow:0 1px 3px rgba(0,0,0,.3),0 10px 40px rgba(0,0,0,.4);
  --shadow2:0 1px 3px rgba(0,0,0,.3),0 20px 60px rgba(0,0,0,.6);
- --navbg:rgba(17,24,39,.85)}
+ --navbg:rgba(17,24,39,.85);
+ --cSpy:#9ca3af;--cSmh:#a78bfa;--cBook:#34d399}
 *{box-sizing:border-box;margin:0}
 html{background:var(--bg2)}
 body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -117,9 +119,13 @@ html[data-theme=dark] #moonic{display:block}
 #uline{position:absolute;bottom:0;height:2.5px;border-radius:2px;
  background:linear-gradient(90deg,#3b82f6,#8b5cf6);
  transition:left .3s ease,width .3s ease;left:0;width:0}
-.tab{display:none}
-.tab.on{display:block;animation:tabin .28s ease}
-@keyframes tabin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+/* sliding tab track: all tabs pre-rendered side by side; the track translates,
+   so swipes are a real finger-following animation, not a display toggle */
+#tview{overflow:hidden;margin:0 -14px}
+#track{display:flex;width:500%;align-items:flex-start;
+ transition:transform .32s cubic-bezier(.25,.7,.3,1)}
+.tab{width:20%;flex:none;padding:0 14px}
+.tab.off{height:0;overflow:hidden}
 .linkrow{display:block;background:var(--card);border-radius:12px;box-shadow:var(--shadow);
  padding:13px 15px;margin-bottom:9px;color:var(--ink);text-decoration:none;font-size:15px}
 .linkrow .d{font-size:12.5px;color:var(--muted);margin-top:1px}
@@ -182,11 +188,13 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       <button data-t="more">More</button>
       <div id="uline"></div>
     </div></div>
-    <div id="t-home" class="tab on"></div>
-    <div id="t-book" class="tab"></div>
-    <div id="t-fund" class="tab"></div>
-    <div id="t-sig"  class="tab"></div>
-    <div id="t-more" class="tab"></div>
+    <div id="tview"><div id="track">
+      <div id="t-home" class="tab"></div>
+      <div id="t-book" class="tab"></div>
+      <div id="t-fund" class="tab"></div>
+      <div id="t-sig"  class="tab"></div>
+      <div id="t-more" class="tab"></div>
+    </div></div>
     <footer>Updated by each morning run + Friday digest. Not investment advice —
     a surveillance tool for a book Anthony already owns. Swipe ⟷ to change tabs.</footer>
   </div>
@@ -253,24 +261,50 @@ async function ghPut(path,text,sha,msg){
 
 function tile(l,v,s,st){return `<div class="tile ${st||""}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`}
 
-function curveSVG(snaps,nc){
-  const pts=(snaps||[]).filter(s=>s&&s.equity!=null);
-  if(pts.length<2) return `<p class="muted">Curve appears after a few daily points — check back.</p>`;
-  const W=600,H=190,P=10,es=pts.map(p=>p.equity),
-    lo=Math.min(...es,nc||Infinity)*0.995,hi=Math.max(...es,nc||0)*1.005;
-  const x=i=>P+i*(W-2*P)/(pts.length-1),
-    y=v=>H-P-(v-lo)*(H-2*P)/(hi-lo||1);
-  const line=pts.map((p,i)=>`${x(i).toFixed(1)},${y(p.equity).toFixed(1)}`).join(" ");
-  const ref=nc?`<line x1="${P}" x2="${W-P}" y1="${y(nc).toFixed(1)}" y2="${y(nc).toFixed(1)}" stroke="var(--muted)" stroke-dasharray="4 4" stroke-width="1"/><text x="${W-P}" y="${(y(nc)-5).toFixed(1)}" text-anchor="end" fill="var(--muted)" font-size="11">put in ${usd(nc)}</text>`:"";
-  const last=pts[pts.length-1];
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="fund equity curve">
+function perfChart(D){
+  // Fund + SPY + SMH + Anthony's personal book on ONE chart. Different
+  // magnitudes → every line is indexed to 100 at its own first point, so the
+  // slopes are directly comparable ("who moved more since it started").
+  const f=D.fund||{};
+  const prep=(arr,key)=>{
+    const pts=(arr||[]).filter(p=>p&&p[key]!=null&&p.date)
+      .map(p=>({t:Date.parse(p.date),v:+p[key]}))
+      .filter(p=>isFinite(p.t)&&p.v>0).sort((a,b)=>a.t-b.t);
+    return pts.length>=2?pts.map(p=>({t:p.t,r:p.v/pts[0].v*100})):null;};
+  const defs=[
+    ["Fund","url(#cg)","#3b82f6",2.5,prep(f.snapshots,"equity")],
+    ["Your book","var(--cBook)","var(--cBook)",2,prep(D.book,"value")],
+    ["SPY","var(--cSpy)","var(--cSpy)",2,prep((D.bench||{}).SPY,"close")],
+    ["SMH","var(--cSmh)","var(--cSmh)",2,prep((D.bench||{}).SMH,"close")]];
+  const series=defs.filter(d=>d[4])
+    .map(([name,col,dot,w,pts])=>({name,col,dot,w,pts}));
+  if(!series.length)
+    return `<p class="muted">Curve appears after a few daily points — check back.</p>`;
+  const allT=[],allR=[100];
+  series.forEach(s=>s.pts.forEach(p=>{allT.push(p.t);allR.push(p.r)}));
+  const t0=Math.min(...allT),t1=Math.max(...allT),
+    lo=Math.min(...allR)-0.6,hi=Math.max(...allR)+0.6;
+  const W=600,H=220,P=12;
+  const X=t=>P+(t-t0)*(W-2*P)/((t1-t0)||1),
+        Y=r=>H-P-(r-lo)*(H-2*P)/((hi-lo)||1);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="performance vs benchmarks">
    <defs><linearGradient id="cg" x1="0%" y1="0%" x2="100%" y2="0%">
      <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#8b5cf6"/>
-   </linearGradient></defs>${ref}
-   <polyline points="${line}" fill="none" stroke="url(#cg)" stroke-width="2.5"/>
-   <circle cx="${x(pts.length-1)}" cy="${y(last.equity)}" r="4" fill="#8b5cf6"/>
-   <text x="${x(pts.length-1)-6}" y="${(y(last.equity)-8).toFixed(1)}" text-anchor="end" fill="var(--ink)" font-size="12">${usd(last.equity)}</text></svg>
-   <div class="muted" style="font-size:12px">${esc(pts[0].date)} → ${esc(last.date)}</div>`;
+   </linearGradient></defs>
+   <line x1="${P}" x2="${W-P}" y1="${Y(100).toFixed(1)}" y2="${Y(100).toFixed(1)}"
+     stroke="var(--muted)" stroke-dasharray="4 4" stroke-width="1" opacity=".6"/>`;
+  for(const s of series)
+    svg+=`<polyline points="${s.pts.map(p=>X(p.t).toFixed(1)+","+Y(p.r).toFixed(1)).join(" ")}"
+      fill="none" stroke="${s.col}" stroke-width="${s.w}" stroke-linejoin="round"${
+      s.name==="Fund"?"":' opacity=".85"'}/>`;
+  svg+=`</svg>`;
+  const chips=series.map(s=>{const d=s.pts[s.pts.length-1].r-100;
+    return `<span style="display:inline-flex;align-items:center;gap:5px">`+
+      `<span style="width:9px;height:9px;border-radius:99px;background:${s.dot};display:inline-block"></span>`+
+      `${esc(s.name)} <b class="${d>=0?"pos":"neg"}">${(d>=0?"+":"")+d.toFixed(1)}%</b></span>`}).join("");
+  const day=t=>new Date(t).toISOString().slice(0,10);
+  return svg+`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font-size:12.5px;color:var(--ink2)">${chips}</div>
+   <div class="muted" style="font-size:11.5px;margin-top:5px">${day(t0)} → ${day(t1)} · 100 = each line's own start · book tracking began 2026-07-18</div>`;
 }
 
 function setRing(f){
@@ -307,8 +341,9 @@ function render(D){
     tiles.push(tile("Concentration",t3.toFixed(0)+"%",
       `in top 3 of ${rk.length} · largest ${esc(rk[0].ticker)} ${b0.toFixed(0)}%`,b0>30?"warn":""));}
   tiles.push(tile("Report card",days+"d","pre-registered grading "+D.report_card));
-  $("#t-home").innerHTML=`<div class="tiles">${tiles.join("")}</div>
-    <h2>Fund equity since inception</h2><div class="card" id="hero">${curveSVG(f.snapshots,f.net_contributions)}</div>`;
+  $("#t-home").innerHTML=`<h2 style="margin-top:6px">Performance <span class="muted" style="font-weight:400">(fund · your book · SPY · SMH)</span></h2>
+    <div class="card" id="hero">${perfChart(D)}</div>
+    <div class="tiles">${tiles.join("")}</div>`;
 
   // BOOK (personal) — share counts come from holdings.txt ("AVGO 0.7");
   // names without a count still list, they just can't be valued.
@@ -510,37 +545,76 @@ async function sendAsk(){
   }catch(e){m.textContent=e.message}
 }
 
-// ── tabs: top bar with sliding gradient underline + swipe navigation ──
+// ── tabs: sliding track + finger-following swipe ──
+// All five tabs are pre-rendered side by side on a 500%-wide track; changing
+// tabs translates the track, so the neighbor physically slides into frame.
+// Inactive tabs collapse (height:0) AFTER the slide settles so the page's
+// scroll height belongs to the visible tab only.
 const ORDER=["home","book","fund","sig","more"];
-let CUR="home";
+let CUR="home",_collapseT=null;
+function _setTrack(idx,extraPx){
+  const tr=$("#track");
+  if(tr&&tr.style)tr.style.transform=`translateX(calc(${-idx*20}% + ${extraPx||0}px))`;
+}
+function _uncollapse(){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("off"));
+}
 function goTab(name){
+  const changed=name!==CUR;
   CUR=name;
+  const idx=ORDER.indexOf(name);
   document.querySelectorAll("#tabs button").forEach(b=>
     b.classList[b.dataset.t===name?"add":"remove"]("on"));
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
-  const p=$("#t-"+name);if(p)p.classList.add("on");
+  _uncollapse();
+  const tr=$("#track");
+  if(tr&&tr.style)tr.style.transition="";
+  _setTrack(idx,0);
   const b=document.querySelector(`#tabs button[data-t="${name}"]`),u=$("#uline");
   if(b&&u&&b.offsetWidth){
     u.style.left=b.offsetLeft+"px";u.style.width=b.offsetWidth+"px";
     if(b.scrollIntoView)b.scrollIntoView({inline:"nearest",block:"nearest"});
   }
-  window.scrollTo(0,0);
+  if(changed)window.scrollTo(0,0);
+  clearTimeout(_collapseT);
+  _collapseT=setTimeout(()=>{document.querySelectorAll(".tab").forEach(t=>{
+    if(t.id!=="t-"+CUR)t.classList.add("off")})},380);
 }
 document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>goTab(b.dataset.t));
-let _tx=0,_ty=0,_sok=false;
+let _dg=null;
 if(document.addEventListener){
   document.addEventListener("touchstart",e=>{
     const t=e.touches&&e.touches[0];if(!t)return;
-    _tx=t.clientX;_ty=t.clientY;
-    _sok=!(e.target&&e.target.closest&&e.target.closest(".scroll,#tabs,input,textarea"));
+    const blocked=e.target&&e.target.closest&&
+      e.target.closest(".scroll,#tabs,input,textarea");
+    _dg=blocked?null:{x:t.clientX,y:t.clientY,locked:false,dead:false,dx:0};
   },{passive:true});
-  document.addEventListener("touchend",e=>{
-    if(!_sok||!DATA)return;
-    const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
-    const dx=t.clientX-_tx,dy=t.clientY-_ty;
-    if(Math.abs(dx)<60||Math.abs(dx)<2*Math.abs(dy))return;
-    const i=ORDER.indexOf(CUR)+(dx<0?1:-1);
-    if(i>=0&&i<ORDER.length)goTab(ORDER[i]);
+  document.addEventListener("touchmove",e=>{
+    if(!_dg||_dg.dead||!DATA)return;
+    const t=e.touches&&e.touches[0];if(!t)return;
+    const dx=t.clientX-_dg.x,dy=t.clientY-_dg.y;
+    if(!_dg.locked){
+      if(Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)){_dg.dead=true;return}
+      if(Math.abs(dx)>14&&Math.abs(dx)>Math.abs(dy)*1.4){
+        _dg.locked=true;_uncollapse();
+        const tr=$("#track");if(tr&&tr.style)tr.style.transition="none";
+      }else return;
+    }
+    e.preventDefault();          // horizontal drag owns the gesture now
+    _dg.dx=dx;
+    const idx=ORDER.indexOf(CUR);
+    let px=dx;
+    if((idx===0&&dx>0)||(idx===ORDER.length-1&&dx<0))px=dx/3;  // rubber-band
+    _setTrack(idx,px);
+  },{passive:false});
+  document.addEventListener("touchend",()=>{
+    if(_dg&&_dg.locked){
+      const dx=_dg.dx,idx=ORDER.indexOf(CUR);
+      const tr=$("#track");if(tr&&tr.style)tr.style.transition="";
+      const j=Math.max(0,Math.min(ORDER.length-1,
+        idx+(dx<-60?1:dx>60?-1:0)));
+      goTab(ORDER[j]);
+    }
+    _dg=null;
   },{passive:true});
 }
 
