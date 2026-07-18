@@ -122,9 +122,9 @@ html[data-theme=dark] #moonic{display:block}
 /* sliding tab track: all tabs pre-rendered side by side; the track translates,
    so swipes are a real finger-following animation, not a display toggle */
 #tview{overflow:hidden;margin:0 -14px}
-#track{display:flex;width:500%;align-items:flex-start;
+#track{display:flex;width:600%;align-items:flex-start;
  transition:transform .32s cubic-bezier(.25,.7,.3,1)}
-.tab{width:20%;flex:none;padding:0 14px}
+.tab{width:16.6667%;flex:none;padding:0 14px}
 .tab.off{height:0;overflow:hidden}
 .linkrow{display:block;background:var(--card);border-radius:12px;box-shadow:var(--shadow);
  padding:13px 15px;margin-bottom:9px;color:var(--ink);text-decoration:none;font-size:15px}
@@ -185,6 +185,7 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       <button data-t="book">Book</button>
       <button data-t="fund">Fund</button>
       <button data-t="sig">Signals</button>
+      <button data-t="radar">Radar</button>
       <button data-t="more">More</button>
       <div id="uline"></div>
     </div></div>
@@ -193,6 +194,7 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       <div id="t-book" class="tab"></div>
       <div id="t-fund" class="tab"></div>
       <div id="t-sig"  class="tab"></div>
+      <div id="t-radar" class="tab"></div>
       <div id="t-more" class="tab"></div>
     </div></div>
     <footer>Updated by each morning run + Friday digest. Not investment advice —
@@ -362,14 +364,21 @@ function render(D){
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     return `<div class="card"><b>$${esc(h.ticker)}</b>
     <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
-    ${h.thesis?`<details><summary>why you own it · ${h.breaks.length} break condition${h.breaks.length==1?"":"s"}</summary>
-      <p>${esc(h.thesis)}</p><ol style="padding-left:20px">${h.breaks.map(b=>`<li>${esc(b)}</li>`).join("")}</ol></details>`
-      :`<div class="muted" style="font-size:13px">no rubric yet — add one in thesis_rubrics.txt</div>`}</div>`}).join("");
+    <details><summary>edit shares</summary>
+    ${TOK?`<div style="display:flex;gap:8px;margin-top:8px">
+      <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1">
+      <button class="hsave bp" data-t="${esc(h.ticker)}">Save</button></div>
+      <div class="hmsg muted" data-t="${esc(h.ticker)}" style="font-size:12.5px;margin-top:5px"></div>`
+    :`<div class="muted" style="font-size:13px;margin-top:6px"><a href="#" class="gomore">Turn on in-app editing (More tab)</a> to save from here.</div>`}
+    </details></div>`}).join("");
+  $("#t-book").innerHTML=`${bookHead}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}`;
+
+  // RADAR — the dated-events watch (moved out of Book per Anthony 2026-07-18)
   const cal=(D.calendar||[]).map(e=>{
     const head=e.kind==="macro"?"📅 macro":e.kind==="bellwether"?`🔭 $${esc(e.ticker)}`:`$${esc(e.ticker)}`;
     return `<tr><td>${esc(e.date)}</td><td>${head}</td><td>${esc(e.event)}</td></tr>`}).join("");
-  $("#t-book").innerHTML=`${bookHead}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}
-    <h2>Coming up (45d)</h2><div class="card scroll">${cal?`<table>${cal}</table>`:'<p class="muted">nothing dated</p>'}</div>`;
+  $("#t-radar").innerHTML=`<h2 style="margin-top:6px">Coming up (45d) <span class="muted" style="font-weight:400">— position BEFORE dated events, not after</span></h2>
+    <div class="card scroll">${cal?`<table>${cal}</table>`:'<p class="muted">nothing dated</p>'}</div>`;
 
   // FUND
   const frows=rows.map(r=>`<tr><td>$${esc(r.ticker)}</td><td class="num">${usd(r.value)}</td>
@@ -458,6 +467,9 @@ function render(D){
   const _o=$("#tokoff");if(_o)_o.onclick=ev=>{ev.preventDefault();
     TOK="";localStorage.removeItem("mc_tok");render(DATA)};
   const _a=$("#askgo");if(_a)_a.onclick=()=>sendAsk();
+  document.querySelectorAll(".hsave").forEach(b=>b.onclick=()=>saveOneShare(b.dataset.t));
+  document.querySelectorAll(".gomore").forEach(a=>a.onclick=ev=>{
+    ev.preventDefault();goTab("more")});
   // 3D tilt on the hero card — hover-capable devices only, like the demo
   const hero=$("#hero");
   if(hero&&hero.addEventListener&&window.matchMedia&&window.matchMedia("(hover: hover)").matches){
@@ -530,6 +542,30 @@ function drawShares(ed,rows){
     }catch(e){$("#shmsg").textContent=e.message}};
 }
 
+async function saveOneShare(t){
+  // per-holding save (Anthony 2026-07-18): edits ONLY that ticker's line in
+  // holdings.txt, preserving every other line and the header comments
+  const inp=document.querySelector(`.hsin[data-t="${t}"]`);
+  const msg=document.querySelector(`.hmsg[data-t="${t}"]`);
+  const val=((inp&&inp.value)||"").trim();
+  if(msg)msg.textContent="saving…";
+  try{
+    const {text,sha}=await ghGet("Investing/holdings.txt");
+    let found=false;
+    const out=text.split("\n").map(line=>{
+      const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
+      if(p.length&&p[0].toUpperCase().replace(/^\$/,"")===t){
+        found=true;return val?`${t} ${val}`:t;}
+      return line;});
+    if(!found)out.push(val?`${t} ${val}`:t);
+    await ghPut("Investing/holdings.txt",out.join("\n"),sha,
+                `app: ${t} share count`);
+    const h=(DATA.personal||[]).find(x=>x.ticker===t);
+    if(h)h.shares=val?parseFloat(val):null;
+    render(DATA);
+  }catch(e){if(msg)msg.textContent=e.message}
+}
+
 async function sendAsk(){
   const v=$("#askin").value.trim();
   const m=$("#askmsg");
@@ -550,11 +586,12 @@ async function sendAsk(){
 // tabs translates the track, so the neighbor physically slides into frame.
 // Inactive tabs collapse (height:0) AFTER the slide settles so the page's
 // scroll height belongs to the visible tab only.
-const ORDER=["home","book","fund","sig","more"];
+const ORDER=["home","book","fund","sig","radar","more"];
 let CUR="home",_collapseT=null;
 function _setTrack(idx,extraPx){
   const tr=$("#track");
-  if(tr&&tr.style)tr.style.transform=`translateX(calc(${-idx*20}% + ${extraPx||0}px))`;
+  if(tr&&tr.style)tr.style.transform=
+    `translateX(calc(${-(idx*100/ORDER.length).toFixed(4)}% + ${extraPx||0}px))`;
 }
 function _uncollapse(){
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("off"));
@@ -584,8 +621,14 @@ let _dg=null;
 if(document.addEventListener){
   document.addEventListener("touchstart",e=>{
     const t=e.touches&&e.touches[0];if(!t)return;
-    const blocked=e.target&&e.target.closest&&
-      e.target.closest(".scroll,#tabs,input,textarea");
+    let blocked=e.target&&e.target.closest&&
+      !!e.target.closest("#tabs,input,textarea");
+    // a table only owns the gesture if it genuinely has sideways content to
+    // pan — a list that fits the screen shouldn't eat the tab swipe
+    if(!blocked&&e.target&&e.target.closest){
+      const sc=e.target.closest(".scroll");
+      if(sc&&sc.scrollWidth>sc.clientWidth+2)blocked=true;
+    }
     _dg=blocked?null:{x:t.clientX,y:t.clientY,locked:false,dead:false,dx:0};
   },{passive:true});
   document.addEventListener("touchmove",e=>{
