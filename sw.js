@@ -2,8 +2,8 @@
 // Strategy: the PAGE is network-first (updates land instantly) with cache
 // fallback (opens offline); icons/manifest are cache-first; data.enc is
 // NEVER cached here (the page has its own encrypted-payload cache logic).
-const CACHE = "mc-shell-v1";
-const SHELL = ["./", "index.html", "manifest.json",
+const CACHE = "mc-shell-v2";
+const SHELL = ["./", "index.html", "manifest.json", "spacegrotesk.woff2",
                "icon-180.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {

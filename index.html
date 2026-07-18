@@ -21,7 +21,11 @@
  --shadow:0 1px 3px rgba(0,0,0,.05),0 10px 40px rgba(0,0,0,.08);
  --shadow2:0 1px 3px rgba(0,0,0,.05),0 20px 60px rgba(0,0,0,.15);
  --navbg:rgba(255,255,255,.85);
- --cSpy:#6b7280;--cSmh:#8b5cf6;--cBook:#16a34a}
+ --cSpy:#6b7280;--cSmh:#8b5cf6;--cBook:#16a34a;
+ --tick:#2563eb;--time:#7c3aed;--timebg:#f3e8ff;
+ --amber:#b45309;--amberbg:#fef3c7;--teal:#0f766e;--tealbg:#ccfbf1;
+ --slate:#475569;--slatebg:#e2e8f0;
+ --disp:"Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 html[data-theme=dark]{
  --bg1:#111827;--bg2:#030712;--card:rgba(31,41,55,.92);--tile:rgba(31,41,55,.5);
  --tileline:#374151;--ink:#f3f4f6;--ink2:#9ca3af;--muted:#6b7280;--line:#374151;
@@ -31,7 +35,13 @@ html[data-theme=dark]{
  --shadow:0 1px 3px rgba(0,0,0,.3),0 10px 40px rgba(0,0,0,.4);
  --shadow2:0 1px 3px rgba(0,0,0,.3),0 20px 60px rgba(0,0,0,.6);
  --navbg:rgba(17,24,39,.85);
- --cSpy:#9ca3af;--cSmh:#a78bfa;--cBook:#34d399}
+ --cSpy:#9ca3af;--cSmh:#a78bfa;--cBook:#34d399;
+ --tick:#60a5fa;--time:#c4b5fd;--timebg:rgba(76,29,149,.4);
+ --amber:#fbbf24;--amberbg:rgba(120,53,15,.4);--teal:#2dd4bf;--tealbg:rgba(19,78,74,.45);
+ --slate:#94a3b8;--slatebg:rgba(51,65,85,.5)}
+@font-face{font-family:"Space Grotesk";
+ src:url(spacegrotesk.woff2) format("woff2");
+ font-weight:300 700;font-style:normal;font-display:swap}
 *{box-sizing:border-box;margin:0}
 html{background:var(--bg2)}
 body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -39,8 +49,10 @@ body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-seri
  padding-bottom:34px;min-height:100vh;transition:background .5s,color .5s;
  overscroll-behavior-x:none}
 .wrap{max-width:640px;margin:0 auto;padding:14px 14px 0}
-h1{font-size:22px;font-weight:600}
-h2{font-size:13.5px;font-weight:600;color:var(--ink2);margin:20px 2px 8px}
+h1{font:600 22px/1.25 var(--disp);letter-spacing:-.02em}
+h2{font:600 13.5px/1.35 var(--disp);color:var(--ink2);margin:20px 2px 8px}
+h2::before{content:"";display:inline-block;width:14px;height:3px;border-radius:2px;
+ background:linear-gradient(90deg,#3b82f6,#8b5cf6);margin-right:7px;vertical-align:3px}
 .sub{color:var(--muted);font-size:12.5px;margin-top:1px}
 .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);
  padding:16px;margin-bottom:12px;transition:box-shadow .3s,transform .3s}
@@ -50,7 +62,8 @@ h2{font-size:13.5px;font-weight:600;color:var(--ink2);margin:20px 2px 8px}
  padding:13px 15px;transition:box-shadow .3s}
 .tile .l{font-size:11.5px;font-weight:500;letter-spacing:.3px;color:var(--muted);
  text-transform:uppercase}
-.tile .v{font-size:22px;font-weight:600;margin:3px 0 2px}
+.tile .v{font:600 22px/1.25 var(--disp);margin:3px 0 2px;
+ font-feature-settings:"tnum";letter-spacing:-.01em}
 .tile .s{font-size:12px;color:var(--muted)}
 .tile.good .v{color:var(--good)}.tile.warn .v{color:var(--warn)}.tile.bad .v{color:var(--bad)}
 .inner{background:var(--tile);border:1px solid var(--tileline);border-radius:10px;padding:12px}
@@ -113,7 +126,7 @@ html[data-theme=dark] #moonic{display:block}
  border-bottom:1px solid var(--line)}
 #tabs{position:relative;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
 #tabs::-webkit-scrollbar{display:none}
-#tabs button{font:inherit;font-size:14px;font-weight:500;background:none;border:0;
+#tabs button{font:500 14px/1.3 var(--disp);background:none;border:0;
  color:var(--muted);padding:11px 13px 12px;cursor:pointer;white-space:nowrap;
  transition:color .2s}
 #tabs button.on{color:var(--blue)}
@@ -132,6 +145,33 @@ html[data-theme=dark] #moonic{display:block}
  display:none;pointer-events:none;opacity:.65}
 .xread{font-size:12px;min-height:18px;margin-top:4px}
 tr.drill td{background:var(--tile)}
+/* semantic accents: color always MEANS something (2026-07-18 rework) */
+.tk{color:var(--tick);font-weight:600}
+.bignum{font:600 28px/1.2 var(--disp);font-feature-settings:"tnum";margin:3px 0}
+.pillt{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;
+ padding:1.5px 8px;color:var(--time);background:var(--timebg);white-space:nowrap}
+.etag{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;
+ padding:1.5px 8px;white-space:nowrap}
+.etag.amber{color:var(--amber);background:var(--amberbg)}
+.etag.teal{color:var(--teal);background:var(--tealbg)}
+.etag.slate{color:var(--slate);background:var(--slatebg)}
+.etag.blue{color:var(--tick);background:var(--timebg)}
+.sdot{display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:7px;
+ vertical-align:1px}
+/* Radar event cards */
+.ecard{position:relative;overflow:hidden;display:flex;gap:12px;align-items:flex-start;
+ background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+ padding:12px 14px 12px 16px;margin-bottom:10px}
+.ecard.held::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3.5px;
+ background:var(--amber)}
+.ecard.now::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3.5px;
+ background:linear-gradient(180deg,#3b82f6,#8b5cf6)}
+.dblk{width:46px;flex:none;text-align:center;background:var(--tile);
+ border:1px solid var(--tileline);border-radius:10px;padding:5px 0 4px}
+.dnum{font:700 19px/1.15 var(--disp)}
+.dmon{font-size:10px;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase}
+.etxt{font-size:13.5px;color:var(--ink2);margin-top:3px}
+.ewarn{font-size:12.5px;color:var(--amber);margin-top:4px;font-weight:500}
 .linkrow{display:block;background:var(--card);border-radius:12px;box-shadow:var(--shadow);
  padding:13px 15px;margin-bottom:9px;color:var(--ink);text-decoration:none;font-size:15px}
 .linkrow .d{font-size:12.5px;color:var(--muted);margin-top:1px}
@@ -222,6 +262,7 @@ const pct=(v,dp=1)=>v==null?"—":(v>=0?"+":"")+(v*100).toFixed(dp)+"%";
 const pp=v=>v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"pp";
 const cls=v=>v==null?"":(v>=0?"pos":"neg");
 const pill=v=>v==null?"":`<span class="${v>=0?"pillp":"pilln"}">${pct(v)}</span>`;
+const tk=t=>`<span class="tk">$${esc(t)}</span>`;   // tickers are always blue
 const mdy=d=>{const p=String(d||"").split("-");
   return p.length===3?`${+p[1]}/${+p[2]}/${p[0].slice(2)}`:esc(d)};
 const shfmt=v=>v==null?"—":String(+(+v).toFixed(4));
@@ -419,7 +460,10 @@ function emailCards(e){
     }else cur.lines.push(line);
   }
   if(cur.h||cur.lines.join("").trim())secs.push(cur);
-  return secs.map(s=>`<div class="card">${s.h?`<b style="font-size:14px">${esc(s.h)}</b>`:""}
+  const dotFor=h=>/PICK/i.test(h)?"#3b82f6":/BOOK/i.test(h)?"#0f766e"
+    :/FUND/i.test(h)?"#8b5cf6":/ASK|GAUNTLET|EARNINGS|CAMPING/i.test(h)?"#b45309"
+    :"#6b7280";
+  return secs.map(s=>`<div class="card">${s.h?`<b style="font:600 14px var(--disp)"><span class="sdot" style="background:${dotFor(s.h)}"></span>${esc(s.h)}</b>`:""}
     <pre style="margin:${s.h?"8px":"0"} 0 0;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;color:var(--ink2)">${esc(s.lines.join("\n").trim())}</pre></div>`).join("");
 }
 
@@ -484,14 +528,14 @@ function render(D){
     if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;}
     else if(h.shares!=null) noQuote++;}
   const bookHead=`<div class="card"><div class="l" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;font-weight:500;color:var(--muted)">Your book${bookN<ph.length?" (partial)":""}</div>
-    <div style="font-size:28px;font-weight:600;margin:3px 0">${bookN?usd(bookTot):"—"}</div>
+    <div class="bignum">${bookN?usd(bookTot):"—"}</div>
     <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
     ${TOK?`<a href="#" id="editsh" style="font-weight:600">✎ edit shares in app</a>`
          :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div>
     ${bookCurve(D.book)}</div>
     <div id="shed"></div>`;
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
-    return `<div class="card"><b>$${esc(h.ticker)}</b>
+    return `<div class="card"><b class="tk">$${esc(h.ticker)}</b>
     <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
     <details><summary>edit shares</summary>
     ${TOK?`<div style="display:flex;gap:8px;margin-top:8px">
@@ -510,19 +554,50 @@ function render(D){
       </details>`})()}</div>`}).join("");
   $("#t-book").innerHTML=`${bookHead}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}`;
 
-  // RADAR — the dated-events watch (moved out of Book per Anthony 2026-07-18)
-  const cal=(D.calendar||[]).map(e=>{
-    const head=e.kind==="macro"?"📅 macro":e.kind==="bellwether"?`🔭 $${esc(e.ticker)}`:`$${esc(e.ticker)}`;
-    return `<tr><td>${esc(e.date)}</td><td>${head}</td><td>${esc(e.event)}</td></tr>`}).join("");
-  $("#t-radar").innerHTML=`<h2 style="margin-top:6px">Coming up (45d) <span class="muted" style="font-weight:400">— position BEFORE dated events, not after</span></h2>
-    <div class="card scroll">${cal?`<table>${cal}</table>`:'<p class="muted">nothing dated</p>'}</div>`;
+  // RADAR — calendar-style event cards (visual rework, Anthony 2026-07-18)
+  const heldset=new Set([...ph.map(h=>h.ticker),...rows.map(r=>r.ticker)]);
+  const MONTHS=["JAN","FEB","MAR","APR","MAY","JUN",
+                "JUL","AUG","SEP","OCT","NOV","DEC"];
+  const tnow=Date.parse(D.today||"");
+  const evs=(D.calendar||[]).map(e=>{
+    const t=Date.parse(e.date);
+    const d=isFinite(t)&&isFinite(tnow)?Math.round((t-tnow)/864e5):null;
+    return {...e,t,d}}).filter(e=>isFinite(e.t)).sort((a,b)=>a.t-b.t);
+  const ecard=e=>{
+    const dt=new Date(e.t);
+    const isEarn=/earnings/i.test(e.event||"");
+    const held=e.ticker&&heldset.has(e.ticker);
+    const tag=e.kind==="macro"?'<span class="etag slate">📅 macro</span>'
+      :e.kind==="bellwether"?'<span class="etag teal">🔭 bellwether</span>'
+      :isEarn?'<span class="etag amber">🎯 earnings</span>'
+      :'<span class="etag blue">event</span>';
+    const when=e.d===0?"TODAY":e.d===1?"tomorrow":"in "+e.d+"d";
+    return `<div class="ecard${e.d===0?" now":(held&&isEarn?" held":"")}">
+      <div class="dblk"><div class="dnum">${dt.getUTCDate()}</div><div class="dmon">${MONTHS[dt.getUTCMonth()]}</div></div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          ${e.ticker?`<b class="tk">$${esc(e.ticker)}</b>`:""}${tag}<span class="pillt">${when}</span></div>
+        <div class="etxt">${esc(e.event)}</div>
+        ${held&&isEarn?'<div class="ewarn">⚠ you hold this — binary event; the pre-registered read arrives the day before</div>':""}
+      </div></div>`;
+  };
+  const ggrp=e=>e.d<=7?"This week":e.d<=14?"Next week":"Later";
+  let radarHtml=`<h2 style="margin-top:6px">Coming up (45d) <span class="muted" style="font-weight:400">— position BEFORE dated events, not after</span></h2>`;
+  let lastG=null;
+  for(const e of evs){
+    const g=ggrp(e);
+    if(g!==lastG){radarHtml+=`<div style="font:600 12px var(--disp);color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:${lastG===null?"2px":"16px"} 2px 8px">${g}</div>`;lastG=g;}
+    radarHtml+=ecard(e);
+  }
+  if(!evs.length)radarHtml+='<div class="card"><p class="muted">nothing dated in the next 45 days</p></div>';
+  $("#t-radar").innerHTML=radarHtml;
 
   // FUND
-  const frows=rows.map(r=>`<tr><td>$${esc(r.ticker)}</td>
+  const frows=rows.map(r=>`<tr><td>${tk(r.ticker)}</td>
     <td class="num">${shfmt(r.shares)}</td><td class="num">${usd(r.value)}</td>
     <td class="num">${pill(r.gain_pct)}</td></tr>`).join("");
-  const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td>${mdy(l.date)}</td>
-    <td>${esc(l.kind)}</td><td>$${esc(l.ticker)}</td>
+  const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td class="muted">${mdy(l.date)}</td>
+    <td>${esc(l.kind)}</td><td>${tk(l.ticker)}</td>
     <td class="num">${shfmt(l.shares)}</td><td class="num">${usd(l.cost)}</td>
     <td class="num">${l.price!=null?usd(l.price):"—"}</td></tr>`).join("");
   $("#t-fund").innerHTML=`<div class="tiles">${
@@ -532,14 +607,14 @@ function render(D){
     <h2>Ledger (newest first)</h2><div class="card scroll">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Shares</th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div>`;
 
   // SIGNALS
-  const camps=(D.camping||[]).map(c=>`<div class="card"><b>$${esc(c.ticker)}</b>${c.cross?'<span class="badge">⚡ '+c.callers.length+' callers</span>':""}
+  const camps=(D.camping||[]).map(c=>`<div class="card"><b class="tk">$${esc(c.ticker)}</b>${c.cross?'<span class="badge">⚡ '+c.callers.length+' callers</span>':""}
     <span class="num" style="float:right">${c.price!=null?usd(c.price):""}</span>
     <div class="muted" style="font-size:13px;margin-top:4px">${c.callers.map(e=>`@${esc(e.caller)} (${e.n})`).join(", ")}</div></div>`).join("");
   const track=(D.track||[]).slice().reverse().slice(0,30).map(r=>{
     const s=r.snap||{};
     const edge=s.smh_edge!=null?s.smh_edge:(s.bench_edge!=null?s.bench_edge:s.edge);
     const bl=s.smh_edge!=null?"vs SMH":(s.bench!=null?"vs "+esc(s.bench):"vs SPY");
-    return `<tr><td>${esc((r.date||"").slice(5))}</td><td>$${esc(r.ticker)}${r.winner?' <span class="tag">pick</span>':""}</td>
+    return `<tr><td class="muted">${esc((r.date||"").slice(5))}</td><td>${tk(r.ticker)}${r.winner?' <span class="tag">pick</span>':""}</td>
       <td class="num">T${esc(r.tier??"—")}</td>
       <td class="num ${cls(s.ret)}">${s.ret!=null?pp(s.ret).replace("pp","%"):"—"}</td>
       <td class="num ${cls(edge)}">${edge!=null?pp(edge):"—"}<div class="muted" style="font-size:10px">${r.snap_days?r.snap_days+"d "+bl:""}</div></td></tr>`}).join("");
@@ -554,8 +629,8 @@ function render(D){
 
   // MORE
   const gh="https://github.com/aGibbs05/stock-picker";
-  const asks=(D.asks||[]).map(a=>`<li><b>$${esc(a.ticker)}</b> — ${esc(a.note||"queued for tomorrow's audit")}</li>`).join("");
-  const q13=(D.queue_13f||[]).map(q=>`<li><b>$${esc(q.ticker)}</b> — ${esc(q.manager||"")} ${esc(q.kind||"")}</li>`).join("");
+  const asks=(D.asks||[]).map(a=>`<li><b class="tk">$${esc(a.ticker)}</b> — ${esc(a.note||"queued for tomorrow's audit")}</li>`).join("");
+  const q13=(D.queue_13f||[]).map(q=>`<li><b class="tk">$${esc(q.ticker)}</b> — ${esc(q.manager||"")} ${esc(q.kind||"")}</li>`).join("");
   const tokCard=TOK
     ?`<div class="card"><b>In-app editing: ON ✓</b>
       <div class="muted" style="font-size:12.5px;margin-top:2px">token stored only on this phone, scoped to the one repo</div>
@@ -654,7 +729,7 @@ function render(D){
       String(r.caller||"").toLowerCase().includes(c)).slice(-6).reverse();
     const html=hist.length?hist.map(r=>{const s=r.snap||{};
       const eg=s.smh_edge??s.bench_edge??s.edge;
-      return `${mdy(r.date)} $${esc(r.ticker)} T${esc(r.tier??"—")}${
+      return `${mdy(r.date)} ${tk(r.ticker)} T${esc(r.tier??"—")}${
         s.ret!=null?` ${pp(s.ret).replace("pp","%")}`:""}${
         eg!=null?` (edge ${pp(eg)})`:""}`}).join("<br>")
       :"no graded picks in the recent window";
