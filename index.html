@@ -108,6 +108,9 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:18px 10px 8
 <script>
 "use strict";
 const $=q=>document.querySelector(q);
+let DATA=null;                                   // decrypted payload, re-renderable
+let TOK=localStorage.getItem("mc_tok")||"";      // optional GitHub token (in-app editing)
+const REPO="aGibbs05/stock-picker";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const usd=v=>v==null?"—":"$"+Number(v).toLocaleString("en-US",{maximumFractionDigits:v>=100?0:2});
 const pct=(v,dp=1)=>v==null?"—":(v>=0?"+":"")+(v*100).toFixed(dp)+"%";
@@ -127,6 +130,24 @@ async function unlock(pass){
   const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:buf.slice(16,28)},
     key,buf.slice(28));
   return JSON.parse(new TextDecoder().decode(pt));
+}
+
+// ── GitHub contents API (in-app editing; token lives only in localStorage) ──
+const b64e=s=>btoa(unescape(encodeURIComponent(s)));
+const b64d=s=>decodeURIComponent(escape(atob(String(s).replace(/\s/g,""))));
+const ghH=()=>({Authorization:"Bearer "+TOK,Accept:"application/vnd.github+json"});
+async function ghGet(path){
+  const r=await fetch(`https://api.github.com/repos/${REPO}/contents/${encodeURI(path)}?ref=main&ts=${Date.now()}`,
+    {headers:ghH(),cache:"no-store"});
+  if(r.status===401||r.status===403) throw new Error("GitHub token rejected — reconnect in More");
+  if(!r.ok) throw new Error("GitHub read failed ("+r.status+")");
+  const j=await r.json();return {text:b64d(j.content),sha:j.sha};
+}
+async function ghPut(path,text,sha,msg){
+  const r=await fetch(`https://api.github.com/repos/${REPO}/contents/${encodeURI(path)}`,
+    {method:"PUT",headers:ghH(),
+     body:JSON.stringify({message:msg,content:b64e(text),sha,branch:"main"})});
+  if(!r.ok) throw new Error("GitHub save failed ("+r.status+")");
 }
 
 function tile(l,v,s,st){return `<div class="tile ${st||""}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`}
@@ -185,7 +206,9 @@ function render(D){
   const bookHead=`<div class="card"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2)">Your book${bookN<ph.length?" (partial)":""}</div>
     <div style="font-size:26px;font-weight:650;margin:2px 0">${bookN?usd(bookTot):"—"}</div>
     <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} names have share counts ·
-    <a href="${gh0}/edit/main/Investing/holdings.txt" style="color:var(--blue)">edit shares</a></div></div>`;
+    ${TOK?`<a href="#" id="editsh" style="color:var(--blue);font-weight:600">✎ edit shares in app</a>`
+         :`<a href="#" id="needtok" style="color:var(--blue)">turn on in-app editing (More tab)</a>`}</div></div>
+    <div id="shed"></div>`;
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     return `<div class="card"><b>$${esc(h.ticker)}</b>
     <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.quote!=null?usd(h.quote):"")}</span>
@@ -235,12 +258,32 @@ function render(D){
   const gh="https://github.com/aGibbs05/stock-picker";
   const asks=(D.asks||[]).map(a=>`<li><b>$${esc(a.ticker)}</b> — ${esc(a.note||"queued for tomorrow's audit")}</li>`).join("");
   const q13=(D.queue_13f||[]).map(q=>`<li><b>$${esc(q.ticker)}</b> — ${esc(q.manager||"")} ${esc(q.kind||"")}</li>`).join("");
-  $("#t-more").innerHTML=`<h2>Actions <span class="muted" style="text-transform:none">(opens GitHub editor — the run reads these files live)</span></h2>
-    <div class="card" style="border-color:var(--blue)"><b>Seeing a 404?</b>
-      <div class="muted" style="font-size:13px;margin-top:3px">The repo is private, so GitHub shows a 404 until this browser is signed in.
-      Sign in ONCE as aGibbs05 and every button below works from then on.</div>
-      <p style="margin-top:8px"><a href="https://github.com/login?return_to=%2FaGibbs05%2Fstock-picker" style="color:var(--blue);font-weight:600">→ Sign in to GitHub</a></p></div>
-    <a class="linkrow" href="${gh}/edit/main/Investing/asks.txt">➕ Ask about a ticker<div class="d">add a line like "FPS — heard buzz"; tomorrow's run gives it a full audit</div></a>
+  const tokCard=TOK
+    ?`<div class="card"><b>In-app editing: ON ✓</b>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">token stored only on this phone, scoped to the one repo</div>
+      <p style="margin-top:6px"><a href="#" id="tokoff" style="color:var(--bad)">Disconnect</a></p></div>`
+    :`<div class="card" style="border-color:var(--blue)"><b>Turn on in-app editing</b>
+      <div class="muted" style="font-size:13px;margin-top:3px">One-time setup: give the app its own key so Save buttons work right here — no GitHub pages ever again.</div>
+      <details><summary>create the key (~2 min)</summary><ol style="padding-left:18px">
+        <li><a href="https://github.com/settings/personal-access-tokens/new" style="color:var(--blue)">Open GitHub → new fine-grained token</a> (sign in if asked)</li>
+        <li>Name: <b>mission-control</b> · Expiration: <b>custom, 1 year out</b></li>
+        <li>Repository access: <b>Only select repositories → stock-picker</b></li>
+        <li>Permissions → Repository permissions → <b>Contents: Read and write</b></li>
+        <li>Tap <b>Generate token</b>, copy it, paste below</li></ol></details>
+      <input id="tokin" type="password" placeholder="github_pat_…" style="width:100%;font:inherit;font-size:15px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);margin-top:8px">
+      <button id="tokgo" style="width:100%;font:inherit;font-size:15px;font-weight:600;padding:10px;border-radius:9px;border:0;background:var(--blue);color:#fff;margin-top:8px;cursor:pointer">Save key on this phone</button>
+      <div id="tokmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`;
+  const askCard=TOK
+    ?`<div class="card"><b>➕ Ask about a ticker</b>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">tomorrow morning's run gives it the full audit</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="askin" placeholder="FPS — heard buzz on the dip" style="flex:1;font:inherit;font-size:15px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+        <button id="askgo" style="font:inherit;font-size:15px;font-weight:600;padding:10px 14px;border-radius:9px;border:0;background:var(--blue);color:#fff;cursor:pointer">Queue</button></div>
+      <div id="askmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
+    :`<a class="linkrow" href="${gh}/edit/main/Investing/asks.txt">➕ Ask about a ticker<div class="d">add a line like "FPS — heard buzz"; tomorrow's run gives it a full audit</div></a>`;
+  $("#t-more").innerHTML=`<h2>Actions</h2>
+    ${tokCard}${askCard}
+    <h2>More files <span class="muted" style="text-transform:none">(GitHub editor — needs the browser signed in)</span></h2>
     <a class="linkrow" href="${gh}/edit/main/Investing/fintwit_accounts.txt">👤 Add / remove a caller<div class="d">one handle per line · non-AI: "handle | nonai | XLV" · vet before trusting</div></a>
     <a class="linkrow" href="${gh}/edit/main/Investing/thesis_rubrics.txt">📗 Edit thesis rubrics<div class="d">TICKER | why you own it | break1; break2</div></a>
     <a class="linkrow" href="${gh}/edit/main/Investing/fund_calendar.json">📅 Edit fund calendar<div class="d">earnings & dated events — drives slate widening + gauntlet briefs</div></a>
@@ -252,6 +295,102 @@ function render(D){
     <h2>App</h2><div class="card"><p class="muted" style="font-size:13px">Tip: use your browser's "Add to Home Screen" so this opens like an app.</p>
     <p style="margin-top:8px"><a href="#" id="lock" style="color:var(--bad)">Forget passcode on this phone</a></p></div>`;
   $("#lock").onclick=e=>{e.preventDefault();localStorage.removeItem("mc_pass");location.reload()};
+  // in-app editing wiring (elements exist only in some states — guard each)
+  const _e=$("#editsh");if(_e)_e.onclick=ev=>{ev.preventDefault();openShares()};
+  const _n=$("#needtok");if(_n)_n.onclick=ev=>{ev.preventDefault();
+    nav.forEach(x=>x.classList.remove("on"));document.querySelector('[data-t="more"]').classList.add("on");
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));$("#t-more").classList.add("on");window.scrollTo(0,0)};
+  const _g=$("#tokgo");if(_g)_g.onclick=async()=>{
+    const t=$("#tokin").value.trim();
+    if(!t){$("#tokmsg").textContent="paste the token first";return}
+    $("#tokmsg").textContent="checking the key…";
+    TOK=t;
+    try{await ghGet("Investing/holdings.txt");
+      localStorage.setItem("mc_tok",t);render(DATA);}
+    catch(e){TOK="";$("#tokmsg").textContent="that key didn't work: "+e.message}};
+  const _o=$("#tokoff");if(_o)_o.onclick=ev=>{ev.preventDefault();
+    TOK="";localStorage.removeItem("mc_tok");render(DATA)};
+  const _a=$("#askgo");if(_a)_a.onclick=()=>sendAsk();
+}
+
+// ── in-app editors ─────────────────────────────────────────────────────────
+const _IN='style="font:inherit;font-size:15px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"';
+const _BTN='style="font:inherit;font-size:15px;font-weight:600;padding:10px 14px;border-radius:9px;border:0;background:var(--blue);color:#fff;cursor:pointer"';
+const _BTN2='style="font:inherit;font-size:15px;padding:10px 14px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer"';
+
+async function openShares(){
+  const ed=$("#shed");
+  ed.innerHTML='<div class="card muted">loading holdings…</div>';
+  try{
+    const {text,sha}=await ghGet("Investing/holdings.txt");
+    const head=[],rows=[];
+    for(const line of text.split("\n")){
+      if(!rows.length&&line.trim().startsWith("#")){head.push(line);continue;}
+      const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
+      if(!p.length) continue;
+      const t=p[0].toUpperCase().replace(/^\$/,"");
+      if(t&&t.length<=6) rows.push({t,s:p[1]||""});
+    }
+    ed._head=head;ed._sha=sha;
+    drawShares(ed,rows);
+  }catch(e){ed.innerHTML=`<div class="card" style="color:var(--bad)">${esc(e.message)}</div>`}
+}
+function drawShares(ed,rows){
+  ed._rows=rows;
+  ed.innerHTML=`<div class="card"><b>Edit share counts</b>
+   <div class="muted" style="font-size:12.5px;margin-top:2px">blank = tracked but not valued · ✕ removes the holding entirely (surveillance stops)</div>
+   ${rows.map((r,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+     <b style="width:74px">$${esc(r.t)}</b>
+     <input class="shin" data-i="${i}" type="text" inputmode="decimal" value="${esc(r.s)}" placeholder="shares" ${_IN.replace('style="','style="flex:1;')}>
+     <a href="#" class="shdel" data-i="${i}" style="color:var(--bad);padding:4px 8px;text-decoration:none">✕</a></div>`).join("")}
+   <div style="display:flex;gap:8px;margin-top:12px">
+     <input id="newt" placeholder="TICKER" autocapitalize="characters" ${_IN.replace('style="','style="width:92px;')}>
+     <input id="news" placeholder="shares" inputmode="decimal" ${_IN.replace('style="','style="flex:1;')}>
+     <button id="shadd" ${_BTN2}>Add</button></div>
+   <div style="display:flex;gap:8px;margin-top:12px">
+     <button id="shsave" ${_BTN.replace('style="','style="flex:1;')}>Save</button>
+     <button id="shx" ${_BTN2}>Cancel</button></div>
+   <div id="shmsg" class="muted" style="font-size:12.5px;margin-top:8px"></div></div>`;
+  const grab=()=>{document.querySelectorAll(".shin").forEach(x=>{ed._rows[+x.dataset.i].s=x.value.trim()})};
+  document.querySelectorAll(".shdel").forEach(a=>a.onclick=e=>{e.preventDefault();grab();
+    ed._rows.splice(+a.dataset.i,1);drawShares(ed,ed._rows)});
+  $("#shadd").onclick=()=>{grab();
+    const t=$("#newt").value.trim().toUpperCase().replace(/^\$/,"");
+    if(!/^[A-Z.]{1,6}$/.test(t)){$("#shmsg").textContent="ticker should be 1-6 letters";return}
+    if(ed._rows.some(r=>r.t===t)){$("#shmsg").textContent=t+" is already listed";return}
+    ed._rows.push({t,s:$("#news").value.trim()});drawShares(ed,ed._rows)};
+  $("#shx").onclick=()=>{ed.innerHTML=""};
+  $("#shsave").onclick=async()=>{
+    grab();$("#shmsg").textContent="saving to GitHub…";
+    try{
+      const head=ed._head.length?ed._head:
+        ["# Anthony's personal holdings — TICKER [shares]; # = comment.",
+         "# Edited from the Mission Control app."];
+      const body=ed._rows.map(r=>r.s?`${r.t} ${r.s}`:r.t);
+      await ghPut("Investing/holdings.txt",[...head,...body,""].join("\n"),
+                  ed._sha,"app: update holdings/share counts");
+      // reflect immediately: keep known quotes, swap in the new share counts
+      const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
+      DATA.personal=ed._rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
+        ticker:r.t,shares:r.s?parseFloat(r.s):null}));
+      render(DATA);
+      $("#shmsg")&&($("#shmsg").textContent="saved ✓");
+    }catch(e){$("#shmsg").textContent=e.message}};
+}
+
+async function sendAsk(){
+  const v=$("#askin").value.trim();
+  const m=$("#askmsg");
+  if(!v){m.textContent="type a ticker first, e.g. FPS — heard buzz";return}
+  m.textContent="queuing…";
+  try{
+    const {text,sha}=await ghGet("Investing/asks.txt");
+    await ghPut("Investing/asks.txt",text.replace(/\s*$/,"\n")+v+"\n",sha,"app: new ask");
+    const t=v.split(/[\s—|]+/)[0].toUpperCase().replace(/^\$/,"");
+    (DATA.asks=DATA.asks||[]).push({ticker:t,note:v});
+    render(DATA);
+    const m2=$("#askmsg");if(m2)m2.textContent="queued ✓ — tomorrow morning's run researches it";
+  }catch(e){m.textContent=e.message}
 }
 
 // ── gate wiring ──
@@ -266,6 +405,7 @@ async function tryUnlock(pass,remember){
     const D=await unlock(pass);
     if(remember) localStorage.setItem("mc_pass",pass);
     $("#gate").style.display="none";$("#app").style.display="block";
+    DATA=D;
     render(D);
   }catch(err){
     localStorage.removeItem("mc_pass");
