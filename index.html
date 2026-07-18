@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mission Control</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+<style>
+:root{--bg:#f7f8fa;--card:#ffffff;--ink:#1a2129;--ink2:#5b6774;--muted:#8a94a0;
+ --line:#e4e8ee;--blue:#2a78d6;--good:#1e8e5a;--warn:#b96f10;--bad:#c23b3b;
+ --navbg:#ffffffee}
+@media (prefers-color-scheme:dark){:root{--bg:#101418;--card:#1a2027;--ink:#e8ecf1;
+ --ink2:#aab4bf;--muted:#77818c;--line:#2a323b;--blue:#5b9de4;--good:#3fb37f;
+ --warn:#d99a3d;--bad:#e06c6c;--navbg:#1a2027ee}}
+*{box-sizing:border-box;margin:0}
+body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+ background:var(--bg);color:var(--ink);padding-bottom:76px}
+.wrap{max-width:640px;margin:0 auto;padding:14px 14px 0}
+h1{font-size:19px;padding:4px 2px 0}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2);
+ margin:18px 2px 8px}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 2px 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+ padding:13px 14px;margin-bottom:10px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;
+ padding:11px 13px}
+.tile .l{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2)}
+.tile .v{font-size:21px;font-weight:650;margin:2px 0}
+.tile .s{font-size:12px;color:var(--muted)}
+.tile.good .v{color:var(--good)}.tile.warn .v{color:var(--warn)}.tile.bad .v{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2);
+ text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+td{padding:7px 6px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+.badge{display:inline-block;background:var(--warn);color:#fff;border-radius:8px;
+ font-size:11px;padding:1px 7px;margin-left:6px;font-weight:600}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:8px;
+ font-size:11.5px;padding:1px 7px;color:var(--ink2);margin-left:6px}
+.muted{color:var(--muted)}
+details{margin-top:6px}
+summary{color:var(--blue);font-size:13px;cursor:pointer}
+details p,details li{font-size:13.5px;color:var(--ink2);margin-top:6px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--navbg);
+ backdrop-filter:blur(10px);border-top:1px solid var(--line);
+ padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;font:inherit;font-size:11px;
+ color:var(--muted);padding:9px 0 7px;cursor:pointer}
+nav button .ico{display:block;font-size:20px;line-height:1.15}
+nav button.on{color:var(--blue);font-weight:600}
+.tab{display:none}.tab.on{display:block}
+.linkrow{display:block;background:var(--card);border:1px solid var(--line);
+ border-radius:12px;padding:12px 14px;margin-bottom:8px;color:var(--ink);
+ text-decoration:none;font-size:15px}
+.linkrow .d{font-size:12.5px;color:var(--muted);margin-top:1px}
+svg{max-width:100%;height:auto;display:block}
+#gate{max-width:420px;margin:18vh auto 0;padding:0 20px;text-align:center}
+#gate input{width:100%;font:inherit;font-size:18px;padding:12px;border-radius:12px;
+ border:1px solid var(--line);background:var(--card);color:var(--ink);
+ text-align:center;margin:14px 0 10px}
+#gate button{width:100%;font:inherit;font-size:16px;font-weight:600;padding:12px;
+ border-radius:12px;border:0;background:var(--blue);color:#fff;cursor:pointer}
+#gerr{color:var(--bad);font-size:14px;min-height:20px;margin-top:8px}
+.scroll{overflow-x:auto}
+footer{color:var(--muted);font-size:11.5px;text-align:center;padding:18px 10px 8px}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1 style="font-size:26px">📡 Mission Control</h1>
+  <p class="sub" style="margin-top:8px">Data is encrypted. Enter the passcode.</p>
+  <input id="pass" type="password" autocomplete="current-password"
+         placeholder="passcode" enterkeyhint="go">
+  <button id="go">Unlock</button>
+  <div id="gerr"></div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="wrap">
+    <h1>📡 Mission Control</h1>
+    <div class="sub" id="stamp"></div>
+    <div id="t-home" class="tab on"></div>
+    <div id="t-book" class="tab"></div>
+    <div id="t-fund" class="tab"></div>
+    <div id="t-sig"  class="tab"></div>
+    <div id="t-more" class="tab"></div>
+    <footer>Updated by each morning run + Friday digest. Not investment advice —
+    a surveillance tool for a book Anthony already owns.</footer>
+  </div>
+  <nav id="nav">
+    <button data-t="home" class="on"><span class="ico">🏠</span>Home</button>
+    <button data-t="book"><span class="ico">📗</span>Book</button>
+    <button data-t="fund"><span class="ico">🤖</span>Fund</button>
+    <button data-t="sig"><span class="ico">📡</span>Signals</button>
+    <button data-t="more"><span class="ico">⚙️</span>More</button>
+  </nav>
+</div>
+
+<script>
+"use strict";
+const $=q=>document.querySelector(q);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const usd=v=>v==null?"—":"$"+Number(v).toLocaleString("en-US",{maximumFractionDigits:v>=100?0:2});
+const pct=(v,dp=1)=>v==null?"—":(v>=0?"+":"")+(v*100).toFixed(dp)+"%";
+const pp=v=>v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"pp";
+const cls=v=>v==null?"":(v>=0?"pos":"neg");
+
+// ── decrypt: data.enc = salt(16) | iv(12) | AES-256-GCM ciphertext ──
+async function unlock(pass){
+  const r=await fetch("data.enc?ts="+Date.now(),{cache:"no-store"});
+  if(!r.ok) throw new Error("data.enc not found ("+r.status+")");
+  const buf=await r.arrayBuffer();
+  const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),
+    "PBKDF2",false,["deriveKey"]);
+  const key=await crypto.subtle.deriveKey(
+    {name:"PBKDF2",salt:buf.slice(0,16),iterations:250000,hash:"SHA-256"},
+    km,{name:"AES-GCM",length:256},false,["decrypt"]);
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:buf.slice(16,28)},
+    key,buf.slice(28));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+function tile(l,v,s,st){return `<div class="tile ${st||""}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`}
+
+function curveSVG(snaps,nc){
+  const pts=(snaps||[]).filter(s=>s&&s.equity!=null);
+  if(pts.length<2) return `<p class="muted">Curve appears after a few daily points — check back.</p>`;
+  const W=600,H=190,P=10,es=pts.map(p=>p.equity),
+    lo=Math.min(...es,nc||Infinity)*0.995,hi=Math.max(...es,nc||0)*1.005;
+  const x=i=>P+i*(W-2*P)/(pts.length-1),
+    y=v=>H-P-(v-lo)*(H-2*P)/(hi-lo||1);
+  const line=pts.map((p,i)=>`${x(i).toFixed(1)},${y(p.equity).toFixed(1)}`).join(" ");
+  const ref=nc?`<line x1="${P}" x2="${W-P}" y1="${y(nc).toFixed(1)}" y2="${y(nc).toFixed(1)}" stroke="var(--muted)" stroke-dasharray="4 4" stroke-width="1"/><text x="${W-P}" y="${(y(nc)-5).toFixed(1)}" text-anchor="end" fill="var(--muted)" font-size="11">put in ${usd(nc)}</text>`:"";
+  const last=pts[pts.length-1];
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="fund equity curve">${ref}
+   <polyline points="${line}" fill="none" stroke="var(--blue)" stroke-width="2"/>
+   <circle cx="${x(pts.length-1)}" cy="${y(last.equity)}" r="4" fill="var(--blue)"/>
+   <text x="${x(pts.length-1)-6}" y="${(y(last.equity)-8).toFixed(1)}" text-anchor="end" fill="var(--ink)" font-size="12">${usd(last.equity)}</text></svg>
+   <div class="muted" style="font-size:12px">${esc(pts[0].date)} → ${esc(last.date)}</div>`;
+}
+
+function render(D){
+  $("#stamp").textContent="as of "+D.generated+" · updates with each run";
+  const f=D.fund||{}, bm=f.bench_matched||{};
+
+  // HOME
+  let days=Math.ceil((new Date(D.report_card)-new Date(D.today))/864e5);
+  let tiles=[tile("Fund value",usd(f.equity),`war-chest ${usd(f.cash)} · ${f.n_positions??"—"} positions`)];
+  if(f.sleeve_return!=null){
+    const eS=bm.SPY!=null?(f.sleeve_return-bm.SPY)*100:null,
+          eM=bm.SMH!=null?(f.sleeve_return-bm.SMH)*100:null;
+    let st="",vd="early data";
+    if(eS!=null&&eM!=null){
+      if(eS>0&&eM>0){st="good";vd="beating market + AI sector"}
+      else if(eS>0){st="warn";vd="beating SPY, trailing SMH (beta)"}
+      else{st="bad";vd="trailing the market"}}
+    tiles.push(tile("Invested sleeve",pct(f.sleeve_return),vd,st));
+    for(const s of ["SPY","SMH","RSP"]) if(bm[s]!=null){
+      const e=(f.sleeve_return-bm[s])*100;
+      tiles.push(tile("vs "+s+" (matched)",pct(bm[s]),"edge "+pp(e),e>0?"good":"bad"));}}
+  const rows=f.rows||[], inv=rows.reduce((a,r)=>a+(r.value||0),0);
+  if(inv>0){const rk=[...rows].sort((a,b)=>b.value-a.value),
+    t3=rk.slice(0,3).reduce((a,r)=>a+r.value,0)/inv*100, b0=rk[0].value/inv*100;
+    tiles.push(tile("Concentration",t3.toFixed(0)+"%",
+      `in top 3 of ${rk.length} · largest ${esc(rk[0].ticker)} ${b0.toFixed(0)}%`,b0>30?"warn":""));}
+  tiles.push(tile("Report card",days+"d","pre-registered grading "+D.report_card));
+  $("#t-home").innerHTML=`<div class="tiles">${tiles.join("")}</div>
+    <h2>Fund equity since inception</h2><div class="card">${curveSVG(f.snapshots,f.net_contributions)}</div>`;
+
+  // BOOK (personal)
+  const hold=(D.personal||[]).map(h=>`<div class="card"><b>$${esc(h.ticker)}</b>
+    <span class="num" style="float:right">${h.quote!=null?usd(h.quote):""}</span>
+    ${h.thesis?`<details><summary>why you own it · ${h.breaks.length} break condition${h.breaks.length==1?"":"s"}</summary>
+      <p>${esc(h.thesis)}</p><ol style="padding-left:20px">${h.breaks.map(b=>`<li>${esc(b)}</li>`).join("")}</ol></details>`
+      :`<div class="muted" style="font-size:13px">no rubric yet — add one in thesis_rubrics.txt</div>`}</div>`).join("");
+  const cal=(D.calendar||[]).map(e=>{
+    const head=e.kind==="macro"?"📅 macro":e.kind==="bellwether"?`🔭 $${esc(e.ticker)}`:`$${esc(e.ticker)}`;
+    return `<tr><td>${esc(e.date)}</td><td>${head}</td><td>${esc(e.event)}</td></tr>`}).join("");
+  $("#t-book").innerHTML=`<h2>Your holdings (${(D.personal||[]).length})</h2>${hold||'<p class="muted">—</p>'}
+    <h2>Coming up (45d)</h2><div class="card scroll">${cal?`<table>${cal}</table>`:'<p class="muted">nothing dated</p>'}</div>`;
+
+  // FUND
+  const frows=rows.map(r=>`<tr><td>$${esc(r.ticker)}</td><td class="num">${usd(r.value)}</td>
+    <td class="num ${cls(r.gain_pct)}">${pct(r.gain_pct)}</td></tr>`).join("");
+  const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td>${esc(l.date)}</td>
+    <td>${esc(l.kind)}</td><td>$${esc(l.ticker)}</td><td class="num">${usd(l.cost)}</td>
+    <td class="num">${l.price!=null?usd(l.price):"—"}</td></tr>`).join("");
+  $("#t-fund").innerHTML=`<div class="tiles">${
+    tile("Equity",usd(f.equity),"return "+pct(f.total_return)+" on "+usd(f.net_contributions))}${
+    tile("War-chest",usd(f.cash),"deploy through 2026-12-31")}</div>
+    <h2>Positions</h2><div class="card scroll">${frows?`<table><thead><tr><th>Ticker</th><th class="num">Value</th><th class="num">Gain</th></tr></thead>${frows}</table>`:'<p class="muted">—</p>'}</div>
+    <h2>Ledger (newest first)</h2><div class="card scroll">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div>`;
+
+  // SIGNALS
+  const camps=(D.camping||[]).map(c=>`<div class="card"><b>$${esc(c.ticker)}</b>${c.cross?'<span class="badge">⚡ '+c.callers.length+' callers</span>':""}
+    <span class="num" style="float:right">${c.price!=null?usd(c.price):""}</span>
+    <div class="muted" style="font-size:13px;margin-top:4px">${c.callers.map(e=>`@${esc(e.caller)} (${e.n})`).join(", ")}</div></div>`).join("");
+  const track=(D.track||[]).slice().reverse().slice(0,30).map(r=>{
+    const s=r.snap||{};
+    const edge=s.smh_edge!=null?s.smh_edge:(s.bench_edge!=null?s.bench_edge:s.edge);
+    const bl=s.smh_edge!=null?"vs SMH":(s.bench!=null?"vs "+esc(s.bench):"vs SPY");
+    return `<tr><td>${esc((r.date||"").slice(5))}</td><td>$${esc(r.ticker)}${r.winner?' <span class="tag">pick</span>':""}</td>
+      <td class="num">T${esc(r.tier??"—")}</td>
+      <td class="num ${cls(s.ret)}">${s.ret!=null?pp(s.ret).replace("pp","%"):"—"}</td>
+      <td class="num ${cls(edge)}">${edge!=null?pp(edge):"—"}<div class="muted" style="font-size:10px">${r.snap_days?r.snap_days+"d "+bl:""}</div></td></tr>`}).join("");
+  const callers=(D.callers||[]).filter(c=>c.n>0).map(c=>`<tr><td>@${esc(c.caller)}</td>
+    <td class="num">${c.n}</td><td class="num">${c.hit_rate!=null?(c.hit_rate*100).toFixed(0)+"%":"—"}</td>
+    <td class="num ${cls(c.avg_edge)}">${pp(c.avg_edge)}</td>
+    <td class="num">${c.trusted?c.weight.toFixed(2):'<span class="muted">1.00*</span>'}</td></tr>`).join("");
+  $("#t-sig").innerHTML=`<h2>Camping watch <span class="muted" style="text-transform:none">(10+ = the validated setup)</span></h2>
+    ${camps||'<div class="card"><p class="muted">No caller is building a position yet.</p></div>'}
+    <h2>Track record (latest 30 audited)</h2><div class="card scroll">${track?`<table><thead><tr><th>Date</th><th>Name</th><th class="num">Tier</th><th class="num">Ret</th><th class="num">Edge</th></tr></thead>${track}</table>`:'<p class="muted">—</p>'}</div>
+    <h2>Caller scoreboard</h2><div class="card scroll">${callers?`<table><thead><tr><th>Caller</th><th class="num">n</th><th class="num">Hit</th><th class="num">Edge</th><th class="num">Wt</th></tr></thead>${callers}</table><p class="muted" style="font-size:11.5px;margin-top:6px">* weight neutral until 6+ picks mature 30d (~mid-Aug)</p>`:'<p class="muted">accumulating — first stats ~mid-Aug</p>'}</div>`;
+
+  // MORE
+  const gh="https://github.com/aGibbs05/stock-picker";
+  const asks=(D.asks||[]).map(a=>`<li><b>$${esc(a.ticker)}</b> — ${esc(a.note||"queued for tomorrow's audit")}</li>`).join("");
+  const q13=(D.queue_13f||[]).map(q=>`<li><b>$${esc(q.ticker)}</b> — ${esc(q.manager||"")} ${esc(q.kind||"")}</li>`).join("");
+  $("#t-more").innerHTML=`<h2>Actions <span class="muted" style="text-transform:none">(opens GitHub editor — the run reads these files live)</span></h2>
+    <a class="linkrow" href="${gh}/edit/main/Investing/asks.txt">➕ Ask about a ticker<div class="d">add a line like "FPS — heard buzz"; tomorrow's run gives it a full audit</div></a>
+    <a class="linkrow" href="${gh}/edit/main/Investing/fintwit_accounts.txt">👤 Add / remove a caller<div class="d">one handle per line · non-AI: "handle | nonai | XLV" · vet before trusting</div></a>
+    <a class="linkrow" href="${gh}/edit/main/Investing/thesis_rubrics.txt">📗 Edit thesis rubrics<div class="d">TICKER | why you own it | break1; break2</div></a>
+    <a class="linkrow" href="${gh}/edit/main/Investing/fund_calendar.json">📅 Edit fund calendar<div class="d">earnings & dated events — drives slate widening + gauntlet briefs</div></a>
+    <a class="linkrow" href="${gh}/edit/main/Investing/holdings.txt">💼 Update your holdings<div class="d">one ticker per line</div></a>
+    <a class="linkrow" href="${gh}/edit/main/Investing/superinvestors.txt">🏛 Edit 13F managers</a>
+    <a class="linkrow" href="${gh}/actions">🩺 Run status (GitHub Actions)</a>
+    <h2>Pending asks</h2><div class="card">${asks?`<ul style="padding-left:18px">${asks}</ul>`:'<p class="muted">none queued</p>'}</div>
+    <h2>13F queue</h2><div class="card">${q13?`<ul style="padding-left:18px">${q13}</ul>`:'<p class="muted">empty — next diff on Q2 filings (~mid-Aug)</p>'}</div>
+    <h2>App</h2><div class="card"><p class="muted" style="font-size:13px">Tip: use your browser's "Add to Home Screen" so this opens like an app.</p>
+    <p style="margin-top:8px"><a href="#" id="lock" style="color:var(--bad)">Forget passcode on this phone</a></p></div>`;
+  $("#lock").onclick=e=>{e.preventDefault();localStorage.removeItem("mc_pass");location.reload()};
+}
+
+// ── gate wiring ──
+const nav=document.querySelectorAll("nav button");
+nav.forEach(b=>b.onclick=()=>{
+  nav.forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
+  $("#t-"+b.dataset.t).classList.add("on");window.scrollTo(0,0);});
+
+async function tryUnlock(pass,remember){
+  try{
+    const D=await unlock(pass);
+    if(remember) localStorage.setItem("mc_pass",pass);
+    $("#gate").style.display="none";$("#app").style.display="block";
+    render(D);
+  }catch(err){
+    localStorage.removeItem("mc_pass");
+    $("#gerr").textContent=/decrypt|operation/i.test(String(err))?
+      "Wrong passcode.":"Couldn't load: "+err.message;
+  }
+}
+$("#go").onclick=()=>tryUnlock($("#pass").value.trim(),true);
+$("#pass").addEventListener("keydown",e=>{if(e.key==="Enter")$("#go").click()});
+const saved=localStorage.getItem("mc_pass");
+if(saved){$("#gerr").textContent="unlocking…";tryUnlock(saved,false).then(()=>{$("#gerr").textContent=""});}
+</script>
+</body>
+</html>
