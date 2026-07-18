@@ -176,16 +176,26 @@ function render(D){
   $("#t-home").innerHTML=`<div class="tiles">${tiles.join("")}</div>
     <h2>Fund equity since inception</h2><div class="card">${curveSVG(f.snapshots,f.net_contributions)}</div>`;
 
-  // BOOK (personal)
-  const hold=(D.personal||[]).map(h=>`<div class="card"><b>$${esc(h.ticker)}</b>
-    <span class="num" style="float:right">${h.quote!=null?usd(h.quote):""}</span>
+  // BOOK (personal) — share counts come from holdings.txt ("AVGO 0.7");
+  // names without a count still list, they just can't be valued.
+  const gh0="https://github.com/aGibbs05/stock-picker";
+  const ph=D.personal||[];
+  let bookTot=0,bookN=0;
+  for(const h of ph) if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;}
+  const bookHead=`<div class="card"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2)">Your book${bookN<ph.length?" (partial)":""}</div>
+    <div style="font-size:26px;font-weight:650;margin:2px 0">${bookN?usd(bookTot):"—"}</div>
+    <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} names have share counts ·
+    <a href="${gh0}/edit/main/Investing/holdings.txt" style="color:var(--blue)">edit shares</a></div></div>`;
+  const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
+    return `<div class="card"><b>$${esc(h.ticker)}</b>
+    <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.quote!=null?usd(h.quote):"")}</span>
     ${h.thesis?`<details><summary>why you own it · ${h.breaks.length} break condition${h.breaks.length==1?"":"s"}</summary>
       <p>${esc(h.thesis)}</p><ol style="padding-left:20px">${h.breaks.map(b=>`<li>${esc(b)}</li>`).join("")}</ol></details>`
-      :`<div class="muted" style="font-size:13px">no rubric yet — add one in thesis_rubrics.txt</div>`}</div>`).join("");
+      :`<div class="muted" style="font-size:13px">no rubric yet — add one in thesis_rubrics.txt</div>`}</div>`}).join("");
   const cal=(D.calendar||[]).map(e=>{
     const head=e.kind==="macro"?"📅 macro":e.kind==="bellwether"?`🔭 $${esc(e.ticker)}`:`$${esc(e.ticker)}`;
     return `<tr><td>${esc(e.date)}</td><td>${head}</td><td>${esc(e.event)}</td></tr>`}).join("");
-  $("#t-book").innerHTML=`<h2>Your holdings (${(D.personal||[]).length})</h2>${hold||'<p class="muted">—</p>'}
+  $("#t-book").innerHTML=`${bookHead}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}
     <h2>Coming up (45d)</h2><div class="card scroll">${cal?`<table>${cal}</table>`:'<p class="muted">nothing dated</p>'}</div>`;
 
   // FUND
