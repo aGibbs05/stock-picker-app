@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#101418">
+<meta name="theme-color" content="#f9fafb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Mission Control</title>
@@ -11,98 +11,185 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
 <style>
-:root{--bg:#f7f8fa;--card:#ffffff;--ink:#1a2129;--ink2:#5b6774;--muted:#8a94a0;
- --line:#e4e8ee;--blue:#2a78d6;--good:#1e8e5a;--warn:#b96f10;--bad:#c23b3b;
- --navbg:#ffffffee}
-@media (prefers-color-scheme:dark){:root{--bg:#101418;--card:#1a2027;--ink:#e8ecf1;
- --ink2:#aab4bf;--muted:#77818c;--line:#2a323b;--blue:#5b9de4;--good:#3fb37f;
- --warn:#d99a3d;--bad:#e06c6c;--navbg:#1a2027ee}}
+/* ── Minimal Professional theme (Anthony-approved design, 2026-07-18) ── */
+:root{
+ --bg1:#f9fafb;--bg2:#f3f4f6;--card:#ffffff;--tile:#f9fafb;--tileline:#f3f4f6;
+ --ink:#111827;--ink2:#4b5563;--muted:#6b7280;--line:#e5e7eb;
+ --blue:#3b82f6;--purple:#8b5cf6;
+ --good:#16a34a;--goodbg:#f0fdf4;--warn:#d97706;--warnbg:#fffbeb;
+ --bad:#dc2626;--badbg:#fef2f2;
+ --shadow:0 1px 3px rgba(0,0,0,.05),0 10px 40px rgba(0,0,0,.08);
+ --shadow2:0 1px 3px rgba(0,0,0,.05),0 20px 60px rgba(0,0,0,.15);
+ --navbg:rgba(255,255,255,.85)}
+html[data-theme=dark]{
+ --bg1:#111827;--bg2:#030712;--card:rgba(31,41,55,.92);--tile:rgba(31,41,55,.5);
+ --tileline:#374151;--ink:#f3f4f6;--ink2:#9ca3af;--muted:#6b7280;--line:#374151;
+ --blue:#60a5fa;--purple:#a78bfa;
+ --good:#4ade80;--goodbg:rgba(20,83,45,.3);--warn:#fbbf24;--warnbg:rgba(120,53,15,.3);
+ --bad:#f87171;--badbg:rgba(127,29,29,.3);
+ --shadow:0 1px 3px rgba(0,0,0,.3),0 10px 40px rgba(0,0,0,.4);
+ --shadow2:0 1px 3px rgba(0,0,0,.3),0 20px 60px rgba(0,0,0,.6);
+ --navbg:rgba(17,24,39,.85)}
 *{box-sizing:border-box;margin:0}
+html{background:var(--bg2)}
 body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
- background:var(--bg);color:var(--ink);padding-bottom:76px}
+ background:linear-gradient(135deg,var(--bg1),var(--bg2)) fixed;color:var(--ink);
+ padding-bottom:34px;min-height:100vh;transition:background .5s,color .5s}
 .wrap{max-width:640px;margin:0 auto;padding:14px 14px 0}
-h1{font-size:19px;padding:4px 2px 0}
-h2{font-size:14px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2);
- margin:18px 2px 8px}
-.sub{color:var(--muted);font-size:12.5px;margin:2px 2px 10px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
- padding:13px 14px;margin-bottom:10px}
+h1{font-size:22px;font-weight:600}
+h2{font-size:13.5px;font-weight:600;color:var(--ink2);margin:20px 2px 8px}
+.sub{color:var(--muted);font-size:12.5px;margin-top:1px}
+.card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);
+ padding:16px;margin-bottom:12px;transition:box-shadow .3s,transform .3s}
+@media(hover:hover){.card:hover{box-shadow:var(--shadow2)}}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;
- padding:11px 13px}
-.tile .l{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2)}
-.tile .v{font-size:21px;font-weight:650;margin:2px 0}
+.tile{background:var(--card);border-radius:16px;box-shadow:var(--shadow);
+ padding:13px 15px;transition:box-shadow .3s}
+.tile .l{font-size:11.5px;font-weight:500;letter-spacing:.3px;color:var(--muted);
+ text-transform:uppercase}
+.tile .v{font-size:22px;font-weight:600;margin:3px 0 2px}
 .tile .s{font-size:12px;color:var(--muted)}
 .tile.good .v{color:var(--good)}.tile.warn .v{color:var(--warn)}.tile.bad .v{color:var(--bad)}
+.inner{background:var(--tile);border:1px solid var(--tileline);border-radius:10px;padding:12px}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2);
- text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
-td{padding:7px 6px;border-bottom:1px solid var(--line)}
+th{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;
+ color:var(--muted);text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line)}
 tr:last-child td{border-bottom:0}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .pos{color:var(--good)}.neg{color:var(--bad)}
-.badge{display:inline-block;background:var(--warn);color:#fff;border-radius:8px;
- font-size:11px;padding:1px 7px;margin-left:6px;font-weight:600}
-.tag{display:inline-block;border:1px solid var(--line);border-radius:8px;
- font-size:11.5px;padding:1px 7px;color:var(--ink2);margin-left:6px}
+.pillp,.pilln{display:inline-block;font-size:12px;font-weight:500;border-radius:999px;
+ padding:2px 9px}
+.pillp{color:var(--good);background:var(--goodbg)}
+.pilln{color:var(--bad);background:var(--badbg)}
+.badge{display:inline-block;background:linear-gradient(90deg,var(--warn),#f59e0b);
+ color:#fff;border-radius:999px;font-size:11px;padding:2px 8px;margin-left:6px;font-weight:600}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;
+ font-size:11.5px;padding:1px 8px;color:var(--ink2);margin-left:6px}
 .muted{color:var(--muted)}
 details{margin-top:6px}
 summary{color:var(--blue);font-size:13px;cursor:pointer}
 details p,details li{font-size:13.5px;color:var(--ink2);margin-top:6px}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--navbg);
- backdrop-filter:blur(10px);border-top:1px solid var(--line);
- padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;background:none;border:0;font:inherit;font-size:11px;
- color:var(--muted);padding:9px 0 7px;cursor:pointer}
-nav button .ico{display:block;font-size:20px;line-height:1.15}
-nav button.on{color:var(--blue);font-weight:600}
-.tab{display:none}.tab.on{display:block}
-.linkrow{display:block;background:var(--card);border:1px solid var(--line);
- border-radius:12px;padding:12px 14px;margin-bottom:8px;color:var(--ink);
- text-decoration:none;font-size:15px}
+a{color:var(--blue)}
+/* buttons — gradient primary / bordered secondary, per the design */
+.bp{font:inherit;font-size:15px;font-weight:500;padding:10px 16px;border-radius:10px;
+ border:0;color:#fff;cursor:pointer;
+ background:linear-gradient(90deg,#3b82f6,#8b5cf6);
+ box-shadow:0 1px 2px rgba(0,0,0,.08);transition:filter .2s,box-shadow .2s}
+.bp:hover{filter:brightness(1.06);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.bs{font:inherit;font-size:15px;font-weight:500;padding:10px 16px;border-radius:10px;
+ border:1px solid var(--line);background:var(--card);color:var(--ink2);cursor:pointer;
+ transition:background .2s}
+.inp{font:inherit;font-size:15px;padding:10px 12px;border-radius:10px;
+ border:1px solid var(--line);background:var(--tile);color:var(--ink)}
+.inp:focus{outline:2px solid var(--blue);outline-offset:-1px}
+/* header row: title left · theme toggle + progress ring right */
+#hdr{display:flex;align-items:flex-start;justify-content:space-between;
+ padding:10px 2px 4px;gap:12px}
+#themetog{position:relative;width:56px;height:28px;border-radius:999px;border:0;
+ background:#d1d5db;cursor:pointer;transition:background .3s;flex:none}
+html[data-theme=dark] #themetog{background:#4b5563}
+#knob{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:999px;
+ background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .3s;
+ display:flex;align-items:center;justify-content:center}
+html[data-theme=dark] #knob{transform:translateX(28px)}
+#knob svg{width:14px;height:14px}
+#sunic{display:block;color:#eab308}#moonic{display:none;color:#374151}
+html[data-theme=dark] #sunic{display:none}
+html[data-theme=dark] #moonic{display:block}
+.ring{position:relative;width:60px;height:60px;flex:none;
+ animation:float 3s ease-in-out infinite}
+.ring svg{display:block}
+.ringtxt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+ font-size:13px;font-weight:600;color:var(--ink2)}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+/* top tab bar with sliding gradient underline */
+#tabbar{position:sticky;top:0;z-index:20;background:var(--navbg);
+ backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+ margin:6px -14px 12px;padding:0 14px calc(0px + 0px);
+ border-bottom:1px solid var(--line)}
+#tabs{position:relative;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+#tabs button{font:inherit;font-size:14px;font-weight:500;background:none;border:0;
+ color:var(--muted);padding:11px 13px 12px;cursor:pointer;white-space:nowrap;
+ transition:color .2s}
+#tabs button.on{color:var(--blue)}
+#uline{position:absolute;bottom:0;height:2.5px;border-radius:2px;
+ background:linear-gradient(90deg,#3b82f6,#8b5cf6);
+ transition:left .3s ease,width .3s ease;left:0;width:0}
+.tab{display:none}
+.tab.on{display:block;animation:tabin .28s ease}
+@keyframes tabin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.linkrow{display:block;background:var(--card);border-radius:12px;box-shadow:var(--shadow);
+ padding:13px 15px;margin-bottom:9px;color:var(--ink);text-decoration:none;font-size:15px}
 .linkrow .d{font-size:12.5px;color:var(--muted);margin-top:1px}
-svg{max-width:100%;height:auto;display:block}
-#gate{max-width:420px;margin:18vh auto 0;padding:0 20px;text-align:center}
-#gate input{width:100%;font:inherit;font-size:18px;padding:12px;border-radius:12px;
- border:1px solid var(--line);background:var(--card);color:var(--ink);
- text-align:center;margin:14px 0 10px}
-#gate button{width:100%;font:inherit;font-size:16px;font-weight:600;padding:12px;
- border-radius:12px;border:0;background:var(--blue);color:#fff;cursor:pointer}
-#gerr{color:var(--bad);font-size:14px;min-height:20px;margin-top:8px}
+svg{max-width:100%;height:auto}
+#gate{max-width:400px;margin:16vh auto 0;padding:0 20px}
+#gcard{background:var(--card);border-radius:16px;box-shadow:var(--shadow);
+ padding:28px 22px;text-align:center}
+#gate input{width:100%;text-align:center;font-size:18px;margin:16px 0 10px}
+#gate .bp{width:100%}
+#gerr{color:var(--bad);font-size:14px;min-height:20px;margin-top:10px}
 .scroll{overflow-x:auto}
-footer{color:var(--muted);font-size:11.5px;text-align:center;padding:18px 10px 8px}
+footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8px}
 </style>
 </head>
 <body>
 
 <div id="gate">
-  <h1 style="font-size:26px">📡 Mission Control</h1>
-  <p class="sub" style="margin-top:8px">Data is encrypted. Enter the passcode.</p>
-  <input id="pass" type="password" autocomplete="current-password"
-         placeholder="passcode" enterkeyhint="go">
-  <button id="go">Unlock</button>
-  <div id="gerr"></div>
+  <div id="gcard">
+    <h1 style="font-size:26px">📡 Mission Control</h1>
+    <p class="sub" style="margin-top:6px">Data is encrypted. Enter the passcode.</p>
+    <input id="pass" class="inp" type="password" autocomplete="current-password"
+           placeholder="passcode" enterkeyhint="go">
+    <button id="go" class="bp">Unlock</button>
+    <div id="gerr"></div>
+  </div>
 </div>
 
 <div id="app" style="display:none">
   <div class="wrap">
-    <h1>📡 Mission Control</h1>
-    <div class="sub" id="stamp"></div>
+    <div id="hdr">
+      <div>
+        <h1>Mission Control</h1>
+        <div class="sub" id="stamp"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <button id="themetog" aria-label="Toggle dark mode"><span id="knob">
+          <svg id="sunic" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+          <svg id="moonic" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+        </span></button>
+        <div class="ring" title="% of the fund deployed">
+          <svg width="60" height="60">
+            <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#8b5cf6"/>
+            </linearGradient></defs>
+            <circle cx="30" cy="30" r="20" fill="none" stroke="var(--line)" stroke-width="4"/>
+            <circle id="ringarc" cx="30" cy="30" r="20" fill="none" stroke="url(#rg)"
+              stroke-width="4" stroke-linecap="round"
+              stroke-dasharray="125.66" stroke-dashoffset="125.66"
+              style="transition:stroke-dashoffset .6s ease;transform:rotate(-90deg);transform-origin:center"/>
+          </svg>
+          <div class="ringtxt"><span id="ringpct">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div id="tabbar"><div id="tabs">
+      <button data-t="home" class="on">Home</button>
+      <button data-t="book">Book</button>
+      <button data-t="fund">Fund</button>
+      <button data-t="sig">Signals</button>
+      <button data-t="more">More</button>
+      <div id="uline"></div>
+    </div></div>
     <div id="t-home" class="tab on"></div>
     <div id="t-book" class="tab"></div>
     <div id="t-fund" class="tab"></div>
     <div id="t-sig"  class="tab"></div>
     <div id="t-more" class="tab"></div>
     <footer>Updated by each morning run + Friday digest. Not investment advice —
-    a surveillance tool for a book Anthony already owns.</footer>
+    a surveillance tool for a book Anthony already owns. Swipe ⟷ to change tabs.</footer>
   </div>
-  <nav id="nav">
-    <button data-t="home" class="on"><span class="ico">🏠</span>Home</button>
-    <button data-t="book"><span class="ico">📗</span>Book</button>
-    <button data-t="fund"><span class="ico">🤖</span>Fund</button>
-    <button data-t="sig"><span class="ico">📡</span>Signals</button>
-    <button data-t="more"><span class="ico">⚙️</span>More</button>
-  </nav>
 </div>
 
 <script>
@@ -116,6 +203,20 @@ const usd=v=>v==null?"—":"$"+Number(v).toLocaleString("en-US",{maximumFraction
 const pct=(v,dp=1)=>v==null?"—":(v>=0?"+":"")+(v*100).toFixed(dp)+"%";
 const pp=v=>v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"pp";
 const cls=v=>v==null?"":(v>=0?"pos":"neg");
+const pill=v=>v==null?"":`<span class="${v>=0?"pillp":"pilln"}">${pct(v)}</span>`;
+
+// ── theme: seeded from the phone's preference, manual toggle wins ──
+let THEME=localStorage.getItem("mc_theme")||
+  ((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light");
+function applyTheme(t){
+  if(document.documentElement&&document.documentElement.dataset)
+    document.documentElement.dataset.theme=t;
+  const m=document.querySelector('meta[name="theme-color"]');
+  if(m&&m.setAttribute)m.setAttribute("content",t==="dark"?"#030712":"#f9fafb");
+}
+applyTheme(THEME);
+{const _t=$("#themetog");if(_t)_t.onclick=()=>{THEME=THEME==="dark"?"light":"dark";
+  localStorage.setItem("mc_theme",THEME);applyTheme(THEME);};}
 
 // ── decrypt: data.enc = salt(16) | iv(12) | AES-256-GCM ciphertext ──
 async function unlock(pass){
@@ -162,16 +263,28 @@ function curveSVG(snaps,nc){
   const line=pts.map((p,i)=>`${x(i).toFixed(1)},${y(p.equity).toFixed(1)}`).join(" ");
   const ref=nc?`<line x1="${P}" x2="${W-P}" y1="${y(nc).toFixed(1)}" y2="${y(nc).toFixed(1)}" stroke="var(--muted)" stroke-dasharray="4 4" stroke-width="1"/><text x="${W-P}" y="${(y(nc)-5).toFixed(1)}" text-anchor="end" fill="var(--muted)" font-size="11">put in ${usd(nc)}</text>`:"";
   const last=pts[pts.length-1];
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="fund equity curve">${ref}
-   <polyline points="${line}" fill="none" stroke="var(--blue)" stroke-width="2"/>
-   <circle cx="${x(pts.length-1)}" cy="${y(last.equity)}" r="4" fill="var(--blue)"/>
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="fund equity curve">
+   <defs><linearGradient id="cg" x1="0%" y1="0%" x2="100%" y2="0%">
+     <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#8b5cf6"/>
+   </linearGradient></defs>${ref}
+   <polyline points="${line}" fill="none" stroke="url(#cg)" stroke-width="2.5"/>
+   <circle cx="${x(pts.length-1)}" cy="${y(last.equity)}" r="4" fill="#8b5cf6"/>
    <text x="${x(pts.length-1)-6}" y="${(y(last.equity)-8).toFixed(1)}" text-anchor="end" fill="var(--ink)" font-size="12">${usd(last.equity)}</text></svg>
    <div class="muted" style="font-size:12px">${esc(pts[0].date)} → ${esc(last.date)}</div>`;
+}
+
+function setRing(f){
+  const arc=$("#ringarc"),txt=$("#ringpct");
+  let p=null;
+  if(f&&f.equity>0&&f.cash!=null) p=Math.max(0,Math.min(100,(1-f.cash/f.equity)*100));
+  if(txt)txt.textContent=p==null?"—":p.toFixed(0)+"%";
+  if(arc&&arc.style)arc.style.strokeDashoffset=(125.66-(p==null?0:125.66*p/100)).toFixed(2);
 }
 
 function render(D){
   $("#stamp").textContent="as of "+D.generated+" · updates with each run";
   const f=D.fund||{}, bm=f.bench_matched||{};
+  setRing(f);
 
   // HOME
   let days=Math.ceil((new Date(D.report_card)-new Date(D.today))/864e5);
@@ -195,7 +308,7 @@ function render(D){
       `in top 3 of ${rk.length} · largest ${esc(rk[0].ticker)} ${b0.toFixed(0)}%`,b0>30?"warn":""));}
   tiles.push(tile("Report card",days+"d","pre-registered grading "+D.report_card));
   $("#t-home").innerHTML=`<div class="tiles">${tiles.join("")}</div>
-    <h2>Fund equity since inception</h2><div class="card">${curveSVG(f.snapshots,f.net_contributions)}</div>`;
+    <h2>Fund equity since inception</h2><div class="card" id="hero">${curveSVG(f.snapshots,f.net_contributions)}</div>`;
 
   // BOOK (personal) — share counts come from holdings.txt ("AVGO 0.7");
   // names without a count still list, they just can't be valued.
@@ -205,11 +318,11 @@ function render(D){
   for(const h of ph){
     if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;}
     else if(h.shares!=null) noQuote++;}
-  const bookHead=`<div class="card"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2)">Your book${bookN<ph.length?" (partial)":""}</div>
-    <div style="font-size:26px;font-weight:650;margin:2px 0">${bookN?usd(bookTot):"—"}</div>
+  const bookHead=`<div class="card"><div class="l" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;font-weight:500;color:var(--muted)">Your book${bookN<ph.length?" (partial)":""}</div>
+    <div style="font-size:28px;font-weight:600;margin:3px 0">${bookN?usd(bookTot):"—"}</div>
     <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
-    ${TOK?`<a href="#" id="editsh" style="color:var(--blue);font-weight:600">✎ edit shares in app</a>`
-         :`<a href="#" id="needtok" style="color:var(--blue)">turn on in-app editing (More tab)</a>`}</div></div>
+    ${TOK?`<a href="#" id="editsh" style="font-weight:600">✎ edit shares in app</a>`
+         :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div></div>
     <div id="shed"></div>`;
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     return `<div class="card"><b>$${esc(h.ticker)}</b>
@@ -225,7 +338,7 @@ function render(D){
 
   // FUND
   const frows=rows.map(r=>`<tr><td>$${esc(r.ticker)}</td><td class="num">${usd(r.value)}</td>
-    <td class="num ${cls(r.gain_pct)}">${pct(r.gain_pct)}</td></tr>`).join("");
+    <td class="num">${pill(r.gain_pct)}</td></tr>`).join("");
   const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td>${esc(l.date)}</td>
     <td>${esc(l.kind)}</td><td>$${esc(l.ticker)}</td><td class="num">${usd(l.cost)}</td>
     <td class="num">${l.price!=null?usd(l.price):"—"}</td></tr>`).join("");
@@ -251,7 +364,7 @@ function render(D){
     <td class="num">${c.n}</td><td class="num">${c.hit_rate!=null?(c.hit_rate*100).toFixed(0)+"%":"—"}</td>
     <td class="num ${cls(c.avg_edge)}">${pp(c.avg_edge)}</td>
     <td class="num">${c.trusted?c.weight.toFixed(2):'<span class="muted">1.00*</span>'}</td></tr>`).join("");
-  $("#t-sig").innerHTML=`<h2>Camping watch <span class="muted" style="text-transform:none">(10+ = the validated setup)</span></h2>
+  $("#t-sig").innerHTML=`<h2>Camping watch <span class="muted" style="font-weight:400">(10+ = the validated setup)</span></h2>
     ${camps||'<div class="card"><p class="muted">No caller is building a position yet.</p></div>'}
     <h2>Track record (latest 30 audited)</h2><div class="card scroll">${track?`<table><thead><tr><th>Date</th><th>Name</th><th class="num">Tier</th><th class="num">Ret</th><th class="num">Edge</th></tr></thead>${track}</table>`:'<p class="muted">—</p>'}</div>
     <h2>Caller scoreboard</h2><div class="card scroll">${callers?`<table><thead><tr><th>Caller</th><th class="num">n</th><th class="num">Hit</th><th class="num">Edge</th><th class="num">Wt</th></tr></thead>${callers}</table><p class="muted" style="font-size:11.5px;margin-top:6px">* weight neutral until 6+ picks mature 30d (~mid-Aug)</p>`:'<p class="muted">accumulating — first stats ~mid-Aug</p>'}</div>`;
@@ -264,44 +377,41 @@ function render(D){
     ?`<div class="card"><b>In-app editing: ON ✓</b>
       <div class="muted" style="font-size:12.5px;margin-top:2px">token stored only on this phone, scoped to the one repo</div>
       <p style="margin-top:6px"><a href="#" id="tokoff" style="color:var(--bad)">Disconnect</a></p></div>`
-    :`<div class="card" style="border-color:var(--blue)"><b>Turn on in-app editing</b>
+    :`<div class="card" style="outline:1.5px solid var(--blue);outline-offset:-1.5px"><b>Turn on in-app editing</b>
       <div class="muted" style="font-size:13px;margin-top:3px">One-time setup: give the app its own key so Save buttons work right here — no GitHub pages ever again.</div>
       <details><summary>create the key (~2 min)</summary><ol style="padding-left:18px">
-        <li><a href="https://github.com/settings/personal-access-tokens/new" style="color:var(--blue)">Open GitHub → new fine-grained token</a> (sign in if asked)</li>
-        <li>Name: <b>mission-control</b> · Expiration: <b>custom, 1 year out</b></li>
-        <li>Repository access: <b>Only select repositories → stock-picker</b></li>
-        <li>Permissions → Repository permissions → <b>Contents: Read and write</b></li>
-        <li>Tap <b>Generate token</b>, copy it, paste below</li></ol></details>
-      <input id="tokin" type="password" placeholder="github_pat_…" style="width:100%;font:inherit;font-size:15px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);margin-top:8px">
-      <button id="tokgo" style="width:100%;font:inherit;font-size:15px;font-weight:600;padding:10px;border-radius:9px;border:0;background:var(--blue);color:#fff;margin-top:8px;cursor:pointer">Save key on this phone</button>
+        <li><a href="https://github.com/settings/tokens/new?description=mission-control-key&scopes=repo">Open GitHub → new token</a> (sign in if asked)</li>
+        <li>Expiration: <b>No expiration</b> (or your call)</li>
+        <li>Scroll down, tap <b>Generate token</b> (repo scope is pre-ticked)</li>
+        <li>Copy the ghp_… code, paste below</li></ol></details>
+      <input id="tokin" class="inp" type="password" placeholder="ghp_… or github_pat_…" style="width:100%;margin-top:8px">
+      <button id="tokgo" class="bp" style="width:100%;margin-top:8px">Save key on this phone</button>
       <div id="tokmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`;
   const askCard=TOK
     ?`<div class="card"><b>➕ Ask about a ticker</b>
       <div class="muted" style="font-size:12.5px;margin-top:2px">tomorrow morning's run gives it the full audit</div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <input id="askin" placeholder="FPS — heard buzz on the dip" style="flex:1;font:inherit;font-size:15px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
-        <button id="askgo" style="font:inherit;font-size:15px;font-weight:600;padding:10px 14px;border-radius:9px;border:0;background:var(--blue);color:#fff;cursor:pointer">Queue</button></div>
+        <input id="askin" class="inp" placeholder="FPS — heard buzz on the dip" style="flex:1">
+        <button id="askgo" class="bp">Queue</button></div>
       <div id="askmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
     :`<a class="linkrow" href="${gh}/edit/main/Investing/asks.txt">➕ Ask about a ticker<div class="d">add a line like "FPS — heard buzz"; tomorrow's run gives it a full audit</div></a>`;
   $("#t-more").innerHTML=`<h2>Actions</h2>
     ${tokCard}${askCard}
-    <h2>More files <span class="muted" style="text-transform:none">(GitHub editor — needs the browser signed in)</span></h2>
+    <h2>More files <span class="muted" style="font-weight:400">(GitHub editor — needs the browser signed in)</span></h2>
     <a class="linkrow" href="${gh}/edit/main/Investing/fintwit_accounts.txt">👤 Add / remove a caller<div class="d">one handle per line · non-AI: "handle | nonai | XLV" · vet before trusting</div></a>
     <a class="linkrow" href="${gh}/edit/main/Investing/thesis_rubrics.txt">📗 Edit thesis rubrics<div class="d">TICKER | why you own it | break1; break2</div></a>
     <a class="linkrow" href="${gh}/edit/main/Investing/fund_calendar.json">📅 Edit fund calendar<div class="d">earnings & dated events — drives slate widening + gauntlet briefs</div></a>
-    <a class="linkrow" href="${gh}/edit/main/Investing/holdings.txt">💼 Update your holdings<div class="d">one ticker per line</div></a>
+    <a class="linkrow" href="${gh}/edit/main/Investing/holdings.txt">💼 Update your holdings<div class="d">TICKER [shares] per line — or use the Book tab's in-app editor</div></a>
     <a class="linkrow" href="${gh}/edit/main/Investing/superinvestors.txt">🏛 Edit 13F managers</a>
     <a class="linkrow" href="${gh}/actions">🩺 Run status (GitHub Actions)</a>
     <h2>Pending asks</h2><div class="card">${asks?`<ul style="padding-left:18px">${asks}</ul>`:'<p class="muted">none queued</p>'}</div>
     <h2>13F queue</h2><div class="card">${q13?`<ul style="padding-left:18px">${q13}</ul>`:'<p class="muted">empty — next diff on Q2 filings (~mid-Aug)</p>'}</div>
-    <h2>App</h2><div class="card"><p class="muted" style="font-size:13px">Tip: use your browser's "Add to Home Screen" so this opens like an app.</p>
+    <h2>App</h2><div class="card"><p class="muted" style="font-size:13px">Tip: use your browser's "Add to Home Screen" so this opens like an app. Swipe left/right anywhere to change tabs.</p>
     <p style="margin-top:8px"><a href="#" id="lock" style="color:var(--bad)">Forget passcode on this phone</a></p></div>`;
   $("#lock").onclick=e=>{e.preventDefault();localStorage.removeItem("mc_pass");location.reload()};
   // in-app editing wiring (elements exist only in some states — guard each)
   const _e=$("#editsh");if(_e)_e.onclick=ev=>{ev.preventDefault();openShares()};
-  const _n=$("#needtok");if(_n)_n.onclick=ev=>{ev.preventDefault();
-    nav.forEach(x=>x.classList.remove("on"));document.querySelector('[data-t="more"]').classList.add("on");
-    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));$("#t-more").classList.add("on");window.scrollTo(0,0)};
+  const _n=$("#needtok");if(_n)_n.onclick=ev=>{ev.preventDefault();goTab("more")};
   const _g=$("#tokgo");if(_g)_g.onclick=async()=>{
     const t=$("#tokin").value.trim();
     if(!t){$("#tokmsg").textContent="paste the token first";return}
@@ -313,13 +423,18 @@ function render(D){
   const _o=$("#tokoff");if(_o)_o.onclick=ev=>{ev.preventDefault();
     TOK="";localStorage.removeItem("mc_tok");render(DATA)};
   const _a=$("#askgo");if(_a)_a.onclick=()=>sendAsk();
+  // 3D tilt on the hero card — hover-capable devices only, like the demo
+  const hero=$("#hero");
+  if(hero&&hero.addEventListener&&window.matchMedia&&window.matchMedia("(hover: hover)").matches){
+    hero.addEventListener("mousemove",e=>{
+      const r=hero.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+      const ry=(x-r.width/2)/(r.width/2)*6,rx=(y-r.height/2)/(r.height/2)*-6;
+      hero.style.transform=`perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg)`;});
+    hero.addEventListener("mouseleave",()=>{hero.style.transform="perspective(1000px)"});
+  }
 }
 
 // ── in-app editors ─────────────────────────────────────────────────────────
-const _IN='style="font:inherit;font-size:15px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"';
-const _BTN='style="font:inherit;font-size:15px;font-weight:600;padding:10px 14px;border-radius:9px;border:0;background:var(--blue);color:#fff;cursor:pointer"';
-const _BTN2='style="font:inherit;font-size:15px;padding:10px 14px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer"';
-
 async function openShares(){
   const ed=$("#shed");
   ed.innerHTML='<div class="card muted">loading holdings…</div>';
@@ -343,15 +458,15 @@ function drawShares(ed,rows){
    <div class="muted" style="font-size:12.5px;margin-top:2px">blank = tracked but not valued · ✕ removes the holding entirely (surveillance stops)</div>
    ${rows.map((r,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-top:8px">
      <b style="width:74px">$${esc(r.t)}</b>
-     <input class="shin" data-i="${i}" type="text" inputmode="decimal" value="${esc(r.s)}" placeholder="shares" ${_IN.replace('style="','style="flex:1;')}>
+     <input class="shin inp" data-i="${i}" type="text" inputmode="decimal" value="${esc(r.s)}" placeholder="shares" style="flex:1">
      <a href="#" class="shdel" data-i="${i}" style="color:var(--bad);padding:4px 8px;text-decoration:none">✕</a></div>`).join("")}
    <div style="display:flex;gap:8px;margin-top:12px">
-     <input id="newt" placeholder="TICKER" autocapitalize="characters" ${_IN.replace('style="','style="width:92px;')}>
-     <input id="news" placeholder="shares" inputmode="decimal" ${_IN.replace('style="','style="flex:1;')}>
-     <button id="shadd" ${_BTN2}>Add</button></div>
+     <input id="newt" class="inp" placeholder="TICKER" autocapitalize="characters" style="width:92px">
+     <input id="news" class="inp" placeholder="shares" inputmode="decimal" style="flex:1">
+     <button id="shadd" class="bs">Add</button></div>
    <div style="display:flex;gap:8px;margin-top:12px">
-     <button id="shsave" ${_BTN.replace('style="','style="flex:1;')}>Save</button>
-     <button id="shx" ${_BTN2}>Cancel</button></div>
+     <button id="shsave" class="bp" style="flex:1">Save</button>
+     <button id="shx" class="bs">Cancel</button></div>
    <div id="shmsg" class="muted" style="font-size:12.5px;margin-top:8px"></div></div>`;
   const grab=()=>{document.querySelectorAll(".shin").forEach(x=>{ed._rows[+x.dataset.i].s=x.value.trim()})};
   document.querySelectorAll(".shdel").forEach(a=>a.onclick=e=>{e.preventDefault();grab();
@@ -395,13 +510,41 @@ async function sendAsk(){
   }catch(e){m.textContent=e.message}
 }
 
-// ── gate wiring ──
-const nav=document.querySelectorAll("nav button");
-nav.forEach(b=>b.onclick=()=>{
-  nav.forEach(x=>x.classList.remove("on"));b.classList.add("on");
+// ── tabs: top bar with sliding gradient underline + swipe navigation ──
+const ORDER=["home","book","fund","sig","more"];
+let CUR="home";
+function goTab(name){
+  CUR=name;
+  document.querySelectorAll("#tabs button").forEach(b=>
+    b.classList[b.dataset.t===name?"add":"remove"]("on"));
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
-  $("#t-"+b.dataset.t).classList.add("on");window.scrollTo(0,0);});
+  const p=$("#t-"+name);if(p)p.classList.add("on");
+  const b=document.querySelector(`#tabs button[data-t="${name}"]`),u=$("#uline");
+  if(b&&u&&b.offsetWidth){
+    u.style.left=b.offsetLeft+"px";u.style.width=b.offsetWidth+"px";
+    if(b.scrollIntoView)b.scrollIntoView({inline:"nearest",block:"nearest"});
+  }
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>goTab(b.dataset.t));
+let _tx=0,_ty=0,_sok=false;
+if(document.addEventListener){
+  document.addEventListener("touchstart",e=>{
+    const t=e.touches&&e.touches[0];if(!t)return;
+    _tx=t.clientX;_ty=t.clientY;
+    _sok=!(e.target&&e.target.closest&&e.target.closest(".scroll,#tabs,input,textarea"));
+  },{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!_sok||!DATA)return;
+    const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
+    const dx=t.clientX-_tx,dy=t.clientY-_ty;
+    if(Math.abs(dx)<60||Math.abs(dx)<2*Math.abs(dy))return;
+    const i=ORDER.indexOf(CUR)+(dx<0?1:-1);
+    if(i>=0&&i<ORDER.length)goTab(ORDER[i]);
+  },{passive:true});
+}
 
+// ── gate wiring ──
 async function tryUnlock(pass,remember){
   try{
     const D=await unlock(pass);
@@ -409,6 +552,7 @@ async function tryUnlock(pass,remember){
     $("#gate").style.display="none";$("#app").style.display="block";
     DATA=D;
     render(D);
+    if(window.requestAnimationFrame)requestAnimationFrame(()=>goTab(CUR));
   }catch(err){
     localStorage.removeItem("mc_pass");
     $("#gerr").textContent=/decrypt|operation/i.test(String(err))?
