@@ -236,6 +236,10 @@ function render(D){
   const asks=(D.asks||[]).map(a=>`<li><b>$${esc(a.ticker)}</b> — ${esc(a.note||"queued for tomorrow's audit")}</li>`).join("");
   const q13=(D.queue_13f||[]).map(q=>`<li><b>$${esc(q.ticker)}</b> — ${esc(q.manager||"")} ${esc(q.kind||"")}</li>`).join("");
   $("#t-more").innerHTML=`<h2>Actions <span class="muted" style="text-transform:none">(opens GitHub editor — the run reads these files live)</span></h2>
+    <div class="card" style="border-color:var(--blue)"><b>Seeing a 404?</b>
+      <div class="muted" style="font-size:13px;margin-top:3px">The repo is private, so GitHub shows a 404 until this browser is signed in.
+      Sign in ONCE as aGibbs05 and every button below works from then on.</div>
+      <p style="margin-top:8px"><a href="https://github.com/login?return_to=%2FaGibbs05%2Fstock-picker" style="color:var(--blue);font-weight:600">→ Sign in to GitHub</a></p></div>
     <a class="linkrow" href="${gh}/edit/main/Investing/asks.txt">➕ Ask about a ticker<div class="d">add a line like "FPS — heard buzz"; tomorrow's run gives it a full audit</div></a>
     <a class="linkrow" href="${gh}/edit/main/Investing/fintwit_accounts.txt">👤 Add / remove a caller<div class="d">one handle per line · non-AI: "handle | nonai | XLV" · vet before trusting</div></a>
     <a class="linkrow" href="${gh}/edit/main/Investing/thesis_rubrics.txt">📗 Edit thesis rubrics<div class="d">TICKER | why you own it | break1; break2</div></a>
