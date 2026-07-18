@@ -201,17 +201,19 @@ function render(D){
   // names without a count still list, they just can't be valued.
   const gh0="https://github.com/aGibbs05/stock-picker";
   const ph=D.personal||[];
-  let bookTot=0,bookN=0;
-  for(const h of ph) if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;}
+  let bookTot=0,bookN=0,noQuote=0;
+  for(const h of ph){
+    if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;}
+    else if(h.shares!=null) noQuote++;}
   const bookHead=`<div class="card"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2)">Your book${bookN<ph.length?" (partial)":""}</div>
     <div style="font-size:26px;font-weight:650;margin:2px 0">${bookN?usd(bookTot):"—"}</div>
-    <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} names have share counts ·
+    <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
     ${TOK?`<a href="#" id="editsh" style="color:var(--blue);font-weight:600">✎ edit shares in app</a>`
          :`<a href="#" id="needtok" style="color:var(--blue)">turn on in-app editing (More tab)</a>`}</div></div>
     <div id="shed"></div>`;
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     return `<div class="card"><b>$${esc(h.ticker)}</b>
-    <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.quote!=null?usd(h.quote):"")}</span>
+    <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
     ${h.thesis?`<details><summary>why you own it · ${h.breaks.length} break condition${h.breaks.length==1?"":"s"}</summary>
       <p>${esc(h.thesis)}</p><ol style="padding-left:20px">${h.breaks.map(b=>`<li>${esc(b)}</li>`).join("")}</ol></details>`
       :`<div class="muted" style="font-size:13px">no rubric yet — add one in thesis_rubrics.txt</div>`}</div>`}).join("");
