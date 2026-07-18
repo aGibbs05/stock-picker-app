@@ -276,6 +276,26 @@ async function ghPut(path,text,sha,msg){
 
 function tile(l,v,s,st){return `<div class="tile ${st||""}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`}
 
+function bookCurve(book){
+  // single-series dollar curve of Anthony's personal book (Book tab header)
+  const pts=(book||[]).filter(p=>p&&p.value!=null&&p.date)
+    .map(p=>({t:Date.parse(p.date),v:+p.value}))
+    .filter(p=>isFinite(p.t)).sort((a,b)=>a.t-b.t);
+  if(pts.length<2)
+    return `<div class="muted" style="font-size:12px;margin-top:8px">tracking since 2026-07-18 — the curve appears as daily points accumulate</div>`;
+  const W=600,H=170,P=12,vs=pts.map(p=>p.v),
+    lo=Math.min(...vs)*0.995,hi=Math.max(...vs)*1.005;
+  const X=t=>P+(t-pts[0].t)*(W-2*P)/((pts[pts.length-1].t-pts[0].t)||1),
+        Y=v=>H-P-(v-lo)*(H-2*P)/((hi-lo)||1);
+  const last=pts[pts.length-1];
+  return `<svg viewBox="0 0 ${W} ${H}" style="margin-top:10px" role="img" aria-label="personal book value over time">
+   <polyline points="${pts.map(p=>X(p.t).toFixed(1)+","+Y(p.v).toFixed(1)).join(" ")}"
+     fill="none" stroke="var(--cBook)" stroke-width="2.5" stroke-linejoin="round"/>
+   <circle cx="${X(last.t).toFixed(1)}" cy="${Y(last.v).toFixed(1)}" r="4" fill="var(--cBook)"/>
+   <text x="${(X(last.t)-6).toFixed(1)}" y="${(Y(last.v)-8).toFixed(1)}" text-anchor="end" fill="var(--ink)" font-size="12">${usd(last.v)}</text></svg>
+   <div class="muted" style="font-size:11.5px">${new Date(pts[0].t).toISOString().slice(0,10)} → ${new Date(last.t).toISOString().slice(0,10)}</div>`;
+}
+
 function perfChart(D){
   // Fund + SPY + SMH + Anthony's personal book on ONE chart. Different
   // magnitudes → every line is indexed to 100 at its own first point, so the
@@ -372,7 +392,8 @@ function render(D){
     <div style="font-size:28px;font-weight:600;margin:3px 0">${bookN?usd(bookTot):"—"}</div>
     <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
     ${TOK?`<a href="#" id="editsh" style="font-weight:600">✎ edit shares in app</a>`
-         :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div></div>
+         :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div>
+    ${bookCurve(D.book)}</div>
     <div id="shed"></div>`;
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     return `<div class="card"><b>$${esc(h.ticker)}</b>
@@ -394,7 +415,8 @@ function render(D){
     <div class="card scroll">${cal?`<table>${cal}</table>`:'<p class="muted">nothing dated</p>'}</div>`;
 
   // FUND
-  const frows=rows.map(r=>`<tr><td>$${esc(r.ticker)}</td><td class="num">${usd(r.value)}</td>
+  const frows=rows.map(r=>`<tr><td>$${esc(r.ticker)}</td>
+    <td class="num">${shfmt(r.shares)}</td><td class="num">${usd(r.value)}</td>
     <td class="num">${pill(r.gain_pct)}</td></tr>`).join("");
   const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td>${mdy(l.date)}</td>
     <td>${esc(l.kind)}</td><td>$${esc(l.ticker)}</td>
@@ -403,7 +425,7 @@ function render(D){
   $("#t-fund").innerHTML=`<div class="tiles">${
     tile("Equity",usd(f.equity),"return "+pct(f.total_return)+" on "+usd(f.net_contributions))}${
     tile("War-chest",usd(f.cash),"deploy through 2026-12-31")}</div>
-    <h2>Positions</h2><div class="card scroll">${frows?`<table><thead><tr><th>Ticker</th><th class="num">Value</th><th class="num">Gain</th></tr></thead>${frows}</table>`:'<p class="muted">—</p>'}</div>
+    <h2>Positions</h2><div class="card scroll">${frows?`<table><thead><tr><th>Ticker</th><th class="num">Shares</th><th class="num">Value</th><th class="num">Gain</th></tr></thead>${frows}</table>`:'<p class="muted">—</p>'}</div>
     <h2>Ledger (newest first)</h2><div class="card scroll">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Shares</th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div>`;
 
   // SIGNALS
