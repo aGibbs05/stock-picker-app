@@ -36,7 +36,8 @@ html[data-theme=dark]{
 html{background:var(--bg2)}
 body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
  background:linear-gradient(135deg,var(--bg1),var(--bg2)) fixed;color:var(--ink);
- padding-bottom:34px;min-height:100vh;transition:background .5s,color .5s}
+ padding-bottom:34px;min-height:100vh;transition:background .5s,color .5s;
+ overscroll-behavior-x:none}
 .wrap{max-width:640px;margin:0 auto;padding:14px 14px 0}
 h1{font-size:22px;font-weight:600}
 h2{font-size:13.5px;font-weight:600;color:var(--ink2);margin:20px 2px 8px}
@@ -184,7 +185,7 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       <button data-t="home" class="on">Home</button>
       <button data-t="book">Book</button>
       <button data-t="fund">Fund</button>
-      <button data-t="sig">Signals</button>
+      <button data-t="sig">Record</button>
       <button data-t="radar">Radar</button>
       <button data-t="more">More</button>
       <div id="uline"></div>
@@ -214,6 +215,18 @@ const pct=(v,dp=1)=>v==null?"—":(v>=0?"+":"")+(v*100).toFixed(dp)+"%";
 const pp=v=>v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"pp";
 const cls=v=>v==null?"":(v>=0?"pos":"neg");
 const pill=v=>v==null?"":`<span class="${v>=0?"pillp":"pilln"}">${pct(v)}</span>`;
+const mdy=d=>{const p=String(d||"").split("-");
+  return p.length===3?`${+p[1]}/${+p[2]}/${p[0].slice(2)}`:esc(d)};
+const shfmt=v=>v==null?"—":String(+(+v).toFixed(4));
+// github-editable files that get IN-APP editors on the More tab
+const FILES=[
+ ["👤 Callers","Investing/fintwit_accounts.txt",
+  "one handle per line · non-AI: handle | nonai | XLV · vet before trusting"],
+ ["📗 Thesis rubrics","Investing/thesis_rubrics.txt",
+  "TICKER | why you own it | break1; break2"],
+ ["📅 Fund calendar","Investing/fund_calendar.json",
+  "JSON list of {date, ticker, event, kind} — drives slate widening + gauntlet briefs"],
+ ["🏛 13F managers","Investing/superinvestors.txt","Name | CIK (optional)"]];
 
 // ── theme: seeded from the phone's preference, manual toggle wins ──
 let THEME=localStorage.getItem("mc_theme")||
@@ -383,14 +396,15 @@ function render(D){
   // FUND
   const frows=rows.map(r=>`<tr><td>$${esc(r.ticker)}</td><td class="num">${usd(r.value)}</td>
     <td class="num">${pill(r.gain_pct)}</td></tr>`).join("");
-  const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td>${esc(l.date)}</td>
-    <td>${esc(l.kind)}</td><td>$${esc(l.ticker)}</td><td class="num">${usd(l.cost)}</td>
+  const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td>${mdy(l.date)}</td>
+    <td>${esc(l.kind)}</td><td>$${esc(l.ticker)}</td>
+    <td class="num">${shfmt(l.shares)}</td><td class="num">${usd(l.cost)}</td>
     <td class="num">${l.price!=null?usd(l.price):"—"}</td></tr>`).join("");
   $("#t-fund").innerHTML=`<div class="tiles">${
     tile("Equity",usd(f.equity),"return "+pct(f.total_return)+" on "+usd(f.net_contributions))}${
     tile("War-chest",usd(f.cash),"deploy through 2026-12-31")}</div>
     <h2>Positions</h2><div class="card scroll">${frows?`<table><thead><tr><th>Ticker</th><th class="num">Value</th><th class="num">Gain</th></tr></thead>${frows}</table>`:'<p class="muted">—</p>'}</div>
-    <h2>Ledger (newest first)</h2><div class="card scroll">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div>`;
+    <h2>Ledger (newest first)</h2><div class="card scroll">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Shares</th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div>`;
 
   // SIGNALS
   const camps=(D.camping||[]).map(c=>`<div class="card"><b>$${esc(c.ticker)}</b>${c.cross?'<span class="badge">⚡ '+c.callers.length+' callers</span>':""}
@@ -439,20 +453,24 @@ function render(D){
         <button id="askgo" class="bp">Queue</button></div>
       <div id="askmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
     :`<a class="linkrow" href="${gh}/edit/main/Investing/asks.txt">➕ Ask about a ticker<div class="d">add a line like "FPS — heard buzz"; tomorrow's run gives it a full audit</div></a>`;
+  const fileCards=TOK
+    ?FILES.map(([n,p,hint])=>`<div class="card"><b>${n}</b>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">${hint}</div>
+      <button class="bs fopen" data-p="${p}" data-n="${esc(n)}" style="margin-top:8px">Open editor</button>
+      <div class="fed" data-p="${p}"></div></div>`).join("")
+    :`<div class="card"><b>File editors</b>
+      <div class="muted" style="font-size:13px;margin-top:3px">Callers, thesis rubrics, the fund calendar and the 13F managers become editable right here once in-app editing is on — set the key above.</div></div>`;
   $("#t-more").innerHTML=`<h2>Actions</h2>
     ${tokCard}${askCard}
-    <h2>More files <span class="muted" style="font-weight:400">(GitHub editor — needs the browser signed in)</span></h2>
-    <a class="linkrow" href="${gh}/edit/main/Investing/fintwit_accounts.txt">👤 Add / remove a caller<div class="d">one handle per line · non-AI: "handle | nonai | XLV" · vet before trusting</div></a>
-    <a class="linkrow" href="${gh}/edit/main/Investing/thesis_rubrics.txt">📗 Edit thesis rubrics<div class="d">TICKER | why you own it | break1; break2</div></a>
-    <a class="linkrow" href="${gh}/edit/main/Investing/fund_calendar.json">📅 Edit fund calendar<div class="d">earnings & dated events — drives slate widening + gauntlet briefs</div></a>
-    <a class="linkrow" href="${gh}/edit/main/Investing/holdings.txt">💼 Update your holdings<div class="d">TICKER [shares] per line — or use the Book tab's in-app editor</div></a>
-    <a class="linkrow" href="${gh}/edit/main/Investing/superinvestors.txt">🏛 Edit 13F managers</a>
-    <a class="linkrow" href="${gh}/actions">🩺 Run status (GitHub Actions)</a>
+    <h2>Edit the system's files <span class="muted" style="font-weight:400">(saved straight from the app; the next run reads them)</span></h2>
+    ${fileCards}
     <h2>Pending asks</h2><div class="card">${asks?`<ul style="padding-left:18px">${asks}</ul>`:'<p class="muted">none queued</p>'}</div>
     <h2>13F queue</h2><div class="card">${q13?`<ul style="padding-left:18px">${q13}</ul>`:'<p class="muted">empty — next diff on Q2 filings (~mid-Aug)</p>'}</div>
     <h2>App</h2><div class="card"><p class="muted" style="font-size:13px">Tip: use your browser's "Add to Home Screen" so this opens like an app. Swipe left/right anywhere to change tabs.</p>
+    <p style="margin-top:8px"><a href="${gh}/actions">🩺 Run status (view-only, opens GitHub)</a></p>
     <p style="margin-top:8px"><a href="#" id="lock" style="color:var(--bad)">Forget passcode on this phone</a></p></div>`;
-  $("#lock").onclick=e=>{e.preventDefault();localStorage.removeItem("mc_pass");location.reload()};
+  $("#lock").onclick=e=>{e.preventDefault();localStorage.removeItem("mc_pass");
+    localStorage.removeItem("mc_cache");location.reload()};
   // in-app editing wiring (elements exist only in some states — guard each)
   const _e=$("#editsh");if(_e)_e.onclick=ev=>{ev.preventDefault();openShares()};
   const _n=$("#needtok");if(_n)_n.onclick=ev=>{ev.preventDefault();goTab("more")};
@@ -470,6 +488,7 @@ function render(D){
   document.querySelectorAll(".hsave").forEach(b=>b.onclick=()=>saveOneShare(b.dataset.t));
   document.querySelectorAll(".gomore").forEach(a=>a.onclick=ev=>{
     ev.preventDefault();goTab("more")});
+  document.querySelectorAll(".fopen").forEach(b=>b.onclick=()=>openFileEditor(b.dataset.p));
   // 3D tilt on the hero card — hover-capable devices only, like the demo
   const hero=$("#hero");
   if(hero&&hero.addEventListener&&window.matchMedia&&window.matchMedia("(hover: hover)").matches){
@@ -566,6 +585,38 @@ async function saveOneShare(t){
   }catch(e){if(msg)msg.textContent=e.message}
 }
 
+async function openFileEditor(path){
+  // generic in-app editor for the github-editable config files (More tab):
+  // load → textarea → Save (JSON files are validated before saving)
+  const box=document.querySelector(`.fed[data-p="${path}"]`);
+  if(!box)return;
+  box.innerHTML='<div class="muted" style="margin-top:8px">loading…</div>';
+  try{
+    const {text,sha}=await ghGet(path);
+    box._sha=sha;
+    box.innerHTML=`<textarea class="inp" rows="10" spellcheck="false"
+      style="width:100%;margin-top:8px;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow-x:auto">${esc(text)}</textarea>
+     <div style="display:flex;gap:8px;margin-top:8px">
+       <button class="bp fsave" style="flex:1">Save</button>
+       <button class="bs fx">Close</button></div>
+     <div class="muted fmsg" style="font-size:12.5px;margin-top:6px"></div>`;
+    const ta=box.querySelector("textarea"),ms=box.querySelector(".fmsg");
+    box.querySelector(".fx").onclick=()=>{box.innerHTML=""};
+    box.querySelector(".fsave").onclick=async()=>{
+      const v=ta.value;
+      if(path.endsWith(".json")){
+        try{JSON.parse(v)}
+        catch(e){ms.textContent="not valid JSON — fix before saving: "+e.message;return}}
+      ms.textContent="saving…";
+      try{
+        await ghPut(path,v,box._sha,"app: edit "+path.split("/").pop());
+        const g=await ghGet(path);box._sha=g.sha;   // fresh sha for re-saves
+        ms.textContent="saved ✓ — the next run reads it";
+      }catch(e){ms.textContent=e.message}};
+  }catch(e){
+    box.innerHTML=`<div style="color:var(--bad);margin-top:8px;font-size:13px">${esc(e.message)}</div>`}
+}
+
 async function sendAsk(){
   const v=$("#askin").value.trim();
   const m=$("#askmsg");
@@ -629,7 +680,8 @@ if(document.addEventListener){
       const sc=e.target.closest(".scroll");
       if(sc&&sc.scrollWidth>sc.clientWidth+2)blocked=true;
     }
-    _dg=blocked?null:{x:t.clientX,y:t.clientY,locked:false,dead:false,dx:0};
+    _dg=blocked?null:{x:t.clientX,y:t.clientY,locked:false,dead:false,dx:0,
+                      t:Date.now()};
   },{passive:true});
   document.addEventListener("touchmove",e=>{
     if(!_dg||_dg.dead||!DATA)return;
@@ -653,24 +705,35 @@ if(document.addEventListener){
     if(_dg&&_dg.locked){
       const dx=_dg.dx,idx=ORDER.indexOf(CUR);
       const tr=$("#track");if(tr&&tr.style)tr.style.transition="";
-      const j=Math.max(0,Math.min(ORDER.length-1,
-        idx+(dx<-60?1:dx>60?-1:0)));
+      // commit on distance OR on a quick flick (short but fast)
+      const flick=Math.abs(dx)>25&&(Date.now()-_dg.t)<250;
+      const step=(Math.abs(dx)>60||flick)?(dx<0?1:-1):0;
+      const j=Math.max(0,Math.min(ORDER.length-1,idx+step));
       goTab(ORDER[j]);
     }
     _dg=null;
   },{passive:true});
 }
 
-// ── gate wiring ──
+// ── gate wiring + instant-open (stale-while-revalidate) ──
+// With a remembered passcode, the LAST decrypted payload renders instantly
+// from cache while the fresh fetch + key-derivation runs in the background —
+// the app opens in ~0ms instead of waiting on network + PBKDF2.
 async function tryUnlock(pass,remember){
   try{
     const D=await unlock(pass);
     if(remember) localStorage.setItem("mc_pass",pass);
+    try{localStorage.setItem("mc_cache",JSON.stringify(D))}catch(e){}
     $("#gate").style.display="none";$("#app").style.display="block";
     DATA=D;
     render(D);
     if(window.requestAnimationFrame)requestAnimationFrame(()=>goTab(CUR));
   }catch(err){
+    if(DATA){   // cached view already on screen — stay on it, note quietly
+      $("#stamp").textContent=(DATA.generated?("as of "+DATA.generated):"")+
+        " · couldn't refresh (offline?) — showing last data";
+      return;
+    }
     localStorage.removeItem("mc_pass");
     $("#gerr").textContent=/decrypt|operation/i.test(String(err))?
       "Wrong passcode.":"Couldn't load: "+err.message;
@@ -679,7 +742,20 @@ async function tryUnlock(pass,remember){
 $("#go").onclick=()=>tryUnlock($("#pass").value.trim(),true);
 $("#pass").addEventListener("keydown",e=>{if(e.key==="Enter")$("#go").click()});
 const saved=localStorage.getItem("mc_pass");
-if(saved){$("#gerr").textContent="unlocking…";tryUnlock(saved,false).then(()=>{$("#gerr").textContent=""});}
+if(saved){
+  const c=localStorage.getItem("mc_cache");
+  if(c){
+    try{
+      DATA=JSON.parse(c);
+      $("#gate").style.display="none";$("#app").style.display="block";
+      render(DATA);
+      $("#stamp").textContent+=" · refreshing…";
+      if(window.requestAnimationFrame)requestAnimationFrame(()=>goTab(CUR));
+    }catch(e){DATA=null}
+  }
+  if(!DATA)$("#gerr").textContent="unlocking…";
+  tryUnlock(saved,false).then(()=>{const g=$("#gerr");if(g)g.textContent=""});
+}
 </script>
 </body>
 </html>
