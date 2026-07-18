@@ -123,10 +123,15 @@ html[data-theme=dark] #moonic{display:block}
 /* sliding tab track: all tabs pre-rendered side by side; the track translates,
    so swipes are a real finger-following animation, not a display toggle */
 #tview{overflow:hidden;margin:0 -14px}
-#track{display:flex;width:600%;align-items:flex-start;
+#track{display:flex;width:700%;align-items:flex-start;
  transition:transform .32s cubic-bezier(.25,.7,.3,1)}
-.tab{width:16.6667%;flex:none;padding:0 14px}
+.tab{width:14.2857%;flex:none;padding:0 14px}
 .tab.off{height:0;overflow:hidden}
+.chart{position:relative}
+.xline{position:absolute;top:0;bottom:40px;width:1.5px;background:var(--blue);
+ display:none;pointer-events:none;opacity:.65}
+.xread{font-size:12px;min-height:18px;margin-top:4px}
+tr.drill td{background:var(--tile)}
 .linkrow{display:block;background:var(--card);border-radius:12px;box-shadow:var(--shadow);
  padding:13px 15px;margin-bottom:9px;color:var(--ink);text-decoration:none;font-size:15px}
 .linkrow .d{font-size:12.5px;color:var(--muted);margin-top:1px}
@@ -182,7 +187,8 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       </div>
     </div>
     <div id="tabbar"><div id="tabs">
-      <button data-t="home" class="on">Home</button>
+      <button data-t="today" class="on">Today</button>
+      <button data-t="home">Home</button>
       <button data-t="book">Book</button>
       <button data-t="fund">Fund</button>
       <button data-t="sig">Record</button>
@@ -191,6 +197,7 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       <div id="uline"></div>
     </div></div>
     <div id="tview"><div id="track">
+      <div id="t-today" class="tab"></div>
       <div id="t-home" class="tab"></div>
       <div id="t-book" class="tab"></div>
       <div id="t-fund" class="tab"></div>
@@ -276,11 +283,14 @@ async function ghPut(path,text,sha,msg){
 
 function tile(l,v,s,st){return `<div class="tile ${st||""}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`}
 
+let _PERF=null,_BOOK=null,CHART_RANGE="all";   // scrub + range state
+
 function bookCurve(book){
   // single-series dollar curve of Anthony's personal book (Book tab header)
   const pts=(book||[]).filter(p=>p&&p.value!=null&&p.date)
     .map(p=>({t:Date.parse(p.date),v:+p.value}))
     .filter(p=>isFinite(p.t)).sort((a,b)=>a.t-b.t);
+  _BOOK=null;
   if(pts.length<2)
     return `<div class="muted" style="font-size:12px;margin-top:8px">tracking since 2026-07-18 — the curve appears as daily points accumulate</div>`;
   const W=600,H=170,P=12,vs=pts.map(p=>p.v),
@@ -288,23 +298,34 @@ function bookCurve(book){
   const X=t=>P+(t-pts[0].t)*(W-2*P)/((pts[pts.length-1].t-pts[0].t)||1),
         Y=v=>H-P-(v-lo)*(H-2*P)/((hi-lo)||1);
   const last=pts[pts.length-1];
-  return `<svg viewBox="0 0 ${W} ${H}" style="margin-top:10px" role="img" aria-label="personal book value over time">
+  _BOOK={W,P,t0:pts[0].t,t1:last.t,abs:true,
+         series:[{name:"Book",pts:pts.map(p=>({t:p.t,r:p.v}))}]};
+  return `<div class="chart" data-chart="book"><div class="xline"></div>
+   <svg viewBox="0 0 ${W} ${H}" style="margin-top:10px" role="img" aria-label="personal book value over time">
    <polyline points="${pts.map(p=>X(p.t).toFixed(1)+","+Y(p.v).toFixed(1)).join(" ")}"
      fill="none" stroke="var(--cBook)" stroke-width="2.5" stroke-linejoin="round"/>
    <circle cx="${X(last.t).toFixed(1)}" cy="${Y(last.v).toFixed(1)}" r="4" fill="var(--cBook)"/>
    <text x="${(X(last.t)-6).toFixed(1)}" y="${(Y(last.v)-8).toFixed(1)}" text-anchor="end" fill="var(--ink)" font-size="12">${usd(last.v)}</text></svg>
-   <div class="muted" style="font-size:11.5px">${new Date(pts[0].t).toISOString().slice(0,10)} → ${new Date(last.t).toISOString().slice(0,10)}</div>`;
+   <div class="xread muted">touch the chart to inspect · ${new Date(pts[0].t).toISOString().slice(0,10)} → ${new Date(last.t).toISOString().slice(0,10)}</div></div>`;
 }
 
 function perfChart(D){
   // Fund + SPY + SMH + Anthony's personal book on ONE chart. Different
-  // magnitudes → every line is indexed to 100 at its own first point, so the
-  // slopes are directly comparable ("who moved more since it started").
+  // magnitudes → every line is indexed to 100 at its own first point WITHIN
+  // the selected range, so the slopes are directly comparable.
   const f=D.fund||{};
+  const rawTs=[];
+  const collect=(arr,key)=>{(arr||[]).forEach(p=>{
+    if(p&&p[key]!=null&&p.date){const t=Date.parse(p.date);
+      if(isFinite(t))rawTs.push(t)}})};
+  collect(f.snapshots,"equity");collect(D.book,"value");
+  collect((D.bench||{}).SPY,"close");collect((D.bench||{}).SMH,"close");
+  const tmax=rawTs.length?Math.max(...rawTs):0;
+  const cut=CHART_RANGE==="all"?-Infinity:tmax-(+CHART_RANGE)*864e5;
   const prep=(arr,key)=>{
     const pts=(arr||[]).filter(p=>p&&p[key]!=null&&p.date)
       .map(p=>({t:Date.parse(p.date),v:+p[key]}))
-      .filter(p=>isFinite(p.t)&&p.v>0).sort((a,b)=>a.t-b.t);
+      .filter(p=>isFinite(p.t)&&p.v>0&&p.t>=cut).sort((a,b)=>a.t-b.t);
     return pts.length>=2?pts.map(p=>({t:p.t,r:p.v/pts[0].v*100})):null;};
   const defs=[
     ["Fund","url(#cg)","#3b82f6",2.5,prep(f.snapshots,"equity")],
@@ -313,8 +334,14 @@ function perfChart(D){
     ["SMH","var(--cSmh)","var(--cSmh)",2,prep((D.bench||{}).SMH,"close")]];
   const series=defs.filter(d=>d[4])
     .map(([name,col,dot,w,pts])=>({name,col,dot,w,pts}));
+  const rngRow=`<div style="display:flex;gap:6px;margin-bottom:8px">${
+    [["14","2w"],["30","1m"],["all","All"]].map(([r,l])=>
+      `<button class="rng bs" data-r="${r}" style="padding:4px 13px;font-size:12.5px${
+        r===CHART_RANGE?";color:var(--blue);border-color:var(--blue)":""}">${l}</button>`)
+    .join("")}</div>`;
+  _PERF=null;
   if(!series.length)
-    return `<p class="muted">Curve appears after a few daily points — check back.</p>`;
+    return rngRow+`<p class="muted">No data in this range yet — try All.</p>`;
   const allT=[],allR=[100];
   series.forEach(s=>s.pts.forEach(p=>{allT.push(p.t);allR.push(p.r)}));
   const t0=Math.min(...allT),t1=Math.max(...allT),
@@ -338,8 +365,40 @@ function perfChart(D){
       `<span style="width:9px;height:9px;border-radius:99px;background:${s.dot};display:inline-block"></span>`+
       `${esc(s.name)} <b class="${d>=0?"pos":"neg"}">${(d>=0?"+":"")+d.toFixed(1)}%</b></span>`}).join("");
   const day=t=>new Date(t).toISOString().slice(0,10);
-  return svg+`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font-size:12.5px;color:var(--ink2)">${chips}</div>
-   <div class="muted" style="font-size:11.5px;margin-top:5px">${day(t0)} → ${day(t1)} · 100 = each line's own start · book tracking began 2026-07-18</div>`;
+  _PERF={W,P,t0,t1,abs:false,series};
+  return rngRow+`<div class="chart" data-chart="perf"><div class="xline"></div>${svg}
+   <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font-size:12.5px;color:var(--ink2)">${chips}</div>
+   <div class="xread muted">touch the chart to inspect · ${day(t0)} → ${day(t1)} · 100 = each line's start in range</div></div>`;
+}
+
+function wireCharts(){
+  // press/drag on a chart → crosshair + per-line readout at that date
+  document.querySelectorAll(".chart").forEach(ch=>{
+    if(ch._wired)return;ch._wired=true;
+    const move=cx=>{
+      const svg=ch.querySelector&&ch.querySelector("svg");if(!svg)return;
+      const info=ch.dataset.chart==="book"?_BOOK:_PERF;if(!info)return;
+      const r=svg.getBoundingClientRect();if(!r.width)return;
+      const xvb=Math.min(Math.max((cx-r.left)/r.width*info.W,info.P),info.W-info.P);
+      const t=info.t0+(xvb-info.P)*(info.t1-info.t0)/((info.W-2*info.P)||1);
+      const parts=[new Date(t).toISOString().slice(5,10).replace("-","/")];
+      for(const s of info.series){
+        let best=s.pts[0];
+        for(const p of s.pts)if(Math.abs(p.t-t)<Math.abs(best.t-t))best=p;
+        parts.push(info.abs?`${s.name} ${usd(best.r)}`
+          :`${s.name} ${(best.r-100>=0?"+":"")+(best.r-100).toFixed(1)}%`);
+      }
+      const rd=ch.querySelector(".xread");if(rd)rd.textContent=parts.join(" · ");
+      const xl=ch.querySelector(".xline");
+      if(xl){xl.style.display="block";
+        xl.style.left=(cx-ch.getBoundingClientRect().left)+"px";}
+    };
+    ch.addEventListener("touchstart",e=>{const t=e.touches[0];if(t)move(t.clientX)},{passive:true});
+    ch.addEventListener("touchmove",e=>{const t=e.touches[0];if(t){move(t.clientX);e.preventDefault()}},{passive:false});
+    ch.addEventListener("mousemove",e=>move(e.clientX));
+    ch.addEventListener("touchend",()=>{const xl=ch.querySelector(".xline");
+      if(xl)xl.style.display="none"},{passive:true});
+  });
 }
 
 function setRing(f){
@@ -350,10 +409,35 @@ function setRing(f){
   if(arc&&arc.style)arc.style.strokeDashoffset=(125.66-(p==null?0:125.66*p/100)).toFixed(2);
 }
 
+function emailCards(e){
+  // split a sent report into cards at its "── SECTION ──" headers
+  const secs=[];let cur={h:"",lines:[]};
+  for(const line of String(e.body||"").split("\n")){
+    if(/^──/.test(line.trim())){
+      if(cur.h||cur.lines.join("").trim())secs.push(cur);
+      cur={h:line.replace(/─/g,"").trim(),lines:[]};
+    }else cur.lines.push(line);
+  }
+  if(cur.h||cur.lines.join("").trim())secs.push(cur);
+  return secs.map(s=>`<div class="card">${s.h?`<b style="font-size:14px">${esc(s.h)}</b>`:""}
+    <pre style="margin:${s.h?"8px":"0"} 0 0;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;color:var(--ink2)">${esc(s.lines.join("\n").trim())}</pre></div>`).join("");
+}
+
 function render(D){
   $("#stamp").textContent="as of "+D.generated+" · updates with each run";
   const f=D.fund||{}, bm=f.bench_matched||{};
   setRing(f);
+
+  // TODAY — the sent reports, in the app (newest first, ~10 kept)
+  const ems=(D.emails||[]).slice().reverse();
+  const latest=ems[0];
+  $("#t-today").innerHTML=latest
+    ?`<h2 style="margin-top:6px">${latest.kind==="digest"?"Weekly digest":"Morning report"} · ${esc(latest.date)}</h2>
+      <div class="card" style="outline:1.5px solid var(--blue);outline-offset:-1.5px"><b>${esc(latest.subject)}</b></div>
+      ${emailCards(latest)}
+      ${ems.length>1?`<h2>Earlier</h2>`+ems.slice(1).map(e2=>
+        `<div class="card"><details><summary>${esc(e2.date)}${e2.kind==="digest"?" · digest":""} · ${esc(e2.subject)}</summary>${emailCards(e2)}</details></div>`).join(""):""}`
+    :`<h2 style="margin-top:6px">Today</h2><div class="card"><p class="muted">The next morning run's full report lands here (and the last ~10 stay scrollable). Until then, it's in your inbox.</p></div>`;
 
   // HOME
   let days=Math.ceil((new Date(D.report_card)-new Date(D.today))/864e5);
@@ -375,6 +459,17 @@ function render(D){
     t3=rk.slice(0,3).reduce((a,r)=>a+r.value,0)/inv*100, b0=rk[0].value/inv*100;
     tiles.push(tile("Concentration",t3.toFixed(0)+"%",
       `in top 3 of ${rk.length} · largest ${esc(rk[0].ticker)} ${b0.toFixed(0)}%`,b0>30?"warn":""));}
+  // You vs the fund (needs 2+ book points — appears once history accumulates)
+  const bk=(D.book||[]).filter(p=>p&&p.value!=null&&p.date);
+  if(bk.length>=2){
+    const b0=bk[0],b1=bk[bk.length-1],bret=(b1.value/b0.value-1)*100;
+    const fs=(f.snapshots||[]).filter(s=>s&&s.equity!=null&&s.date>=b0.date);
+    if(fs.length>=2){
+      const fret=(fs[fs.length-1].equity/fs[0].equity-1)*100,lead=bret-fret;
+      tiles.push(tile("You vs the fund",
+        (lead>=0?"You +":"Fund +")+Math.abs(lead).toFixed(1)+"pp",
+        `since ${esc(b0.date)} · you ${pct(bret/100)} vs fund ${pct(fret/100)}`,
+        lead>=0?"good":"warn"));}}
   tiles.push(tile("Report card",days+"d","pre-registered grading "+D.report_card));
   $("#t-home").innerHTML=`<h2 style="margin-top:6px">Performance <span class="muted" style="font-weight:400">(fund · your book · SPY · SMH)</span></h2>
     <div class="card" id="hero">${perfChart(D)}</div>
@@ -404,7 +499,15 @@ function render(D){
       <button class="hsave bp" data-t="${esc(h.ticker)}">Save</button></div>
       <div class="hmsg muted" data-t="${esc(h.ticker)}" style="font-size:12.5px;margin-top:5px"></div>`
     :`<div class="muted" style="font-size:13px;margin-top:6px"><a href="#" class="gomore">Turn on in-app editing (More tab)</a> to save from here.</div>`}
-    </details></div>`}).join("");
+    </details>${(()=>{   // drill-down: this name's audited history + camp status
+      const hist=(D.track||[]).filter(r=>r.ticker===h.ticker).slice(-5).reverse();
+      const camp=(D.camping||[]).find(c=>c.ticker===h.ticker);
+      if(!hist.length&&!camp)return "";
+      return `<details><summary>pick history${hist.length?` (${hist.length})`:""}${camp?" · camping":""}</summary>
+        ${camp?`<div style="font-size:13px;color:var(--warn);margin-top:6px">⛺ ${camp.callers.map(e2=>`@${esc(e2.caller)} (${e2.n})`).join(", ")} camping</div>`:""}
+        ${hist.map(r=>{const s=r.snap||{};const eg=s.smh_edge??s.bench_edge??s.edge;
+          return `<div style="font-size:13px;color:var(--ink2);margin-top:6px">${mdy(r.date)} · T${esc(r.tier??"—")}${r.winner?" · pick of the day":""}${s.ret!=null?` · ${pp(s.ret).replace("pp","%")} (${r.snap_days}d)`:""}${eg!=null?` · edge ${pp(eg)}`:""}${r.rv?`<div class="muted" style="font-size:12px">${esc(r.rv)}</div>`:""}</div>`}).join("")}
+      </details>`})()}</div>`}).join("");
   $("#t-book").innerHTML=`${bookHead}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}`;
 
   // RADAR — the dated-events watch (moved out of Book per Anthony 2026-07-18)
@@ -440,7 +543,7 @@ function render(D){
       <td class="num">T${esc(r.tier??"—")}</td>
       <td class="num ${cls(s.ret)}">${s.ret!=null?pp(s.ret).replace("pp","%"):"—"}</td>
       <td class="num ${cls(edge)}">${edge!=null?pp(edge):"—"}<div class="muted" style="font-size:10px">${r.snap_days?r.snap_days+"d "+bl:""}</div></td></tr>`}).join("");
-  const callers=(D.callers||[]).filter(c=>c.n>0).map(c=>`<tr><td>@${esc(c.caller)}</td>
+  const callers=(D.callers||[]).filter(c=>c.n>0).map(c=>`<tr class="crow" data-c="${esc(c.caller)}"><td>@${esc(c.caller)}</td>
     <td class="num">${c.n}</td><td class="num">${c.hit_rate!=null?(c.hit_rate*100).toFixed(0)+"%":"—"}</td>
     <td class="num ${cls(c.avg_edge)}">${pp(c.avg_edge)}</td>
     <td class="num">${c.trusted?c.weight.toFixed(2):'<span class="muted">1.00*</span>'}</td></tr>`).join("");
@@ -482,8 +585,16 @@ function render(D){
       <div class="fed" data-p="${p}"></div></div>`).join("")
     :`<div class="card"><b>File editors</b>
       <div class="muted" style="font-size:13px;margin-top:3px">Callers, thesis rubrics, the fund calendar and the 13F managers become editable right here once in-app editing is on — set the key above.</div></div>`;
+  const remoteCard=TOK
+    ?`<div class="card"><b>🕹 Remote control</b>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">kicks off the GitHub workflow — email + app data land in ~5-10 min</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="bs wdis" data-w="daily.yml" style="flex:1">Run the picker (~$1)</button>
+        <button class="bs wdis" data-w="weekly.yml" style="flex:1">Send digest (~$0.50)</button></div>
+      <div id="wmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
+    :"";
   $("#t-more").innerHTML=`<h2>Actions</h2>
-    ${tokCard}${askCard}
+    ${tokCard}${askCard}${remoteCard}
     <h2>Edit the system's files <span class="muted" style="font-weight:400">(saved straight from the app; the next run reads them)</span></h2>
     ${fileCards}
     <h2>Pending asks</h2><div class="card">${asks?`<ul style="padding-left:18px">${asks}</ul>`:'<p class="muted">none queued</p>'}</div>
@@ -511,6 +622,44 @@ function render(D){
   document.querySelectorAll(".gomore").forEach(a=>a.onclick=ev=>{
     ev.preventDefault();goTab("more")});
   document.querySelectorAll(".fopen").forEach(b=>b.onclick=()=>openFileEditor(b.dataset.p));
+  // chart ranges + scrubbing (range tap re-renders; render re-wires)
+  document.querySelectorAll(".rng").forEach(b=>b.onclick=()=>{
+    CHART_RANGE=b.dataset.r;render(DATA);});
+  wireCharts();
+  // remote control: two-tap confirm, then a workflow_dispatch via the token
+  document.querySelectorAll(".wdis").forEach(b=>b.onclick=async()=>{
+    const m=$("#wmsg");
+    if(!b._armed){b._armed=true;b.textContent="Tap again to confirm";
+      b.style.color="var(--warn)";b.style.borderColor="var(--warn)";
+      setTimeout(()=>{if(b._armed){b._armed=false;
+        b.textContent=b.dataset.w==="daily.yml"?"Run the picker (~$1)":"Send digest (~$0.50)";
+        b.style.color="";b.style.borderColor="";}},4000);
+      return;}
+    b._armed=false;
+    if(m)m.textContent="starting the workflow…";
+    try{
+      const r=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${b.dataset.w}/dispatches`,
+        {method:"POST",headers:ghH(),body:JSON.stringify({ref:"main"})});
+      if(r.status!==204)throw new Error("dispatch failed ("+r.status+")");
+      if(m)m.textContent="started ✓ — the email arrives in ~5-10 min; the app refreshes after";
+    }catch(e){if(m)m.textContent=e.message}
+    b.textContent=b.dataset.w==="daily.yml"?"Run the picker (~$1)":"Send digest (~$0.50)";
+    b.style.color="";b.style.borderColor="";});
+  // caller drill-down: tap a scoreboard row for that caller's graded picks
+  document.querySelectorAll(".crow").forEach(tr=>{tr.onclick=()=>{
+    const nx=tr.nextElementSibling;
+    if(nx&&nx.classList&&nx.classList.contains("drill")){nx.remove();return}
+    const c=String(tr.dataset.c||"").toLowerCase();
+    const hist=(DATA.track||[]).filter(r=>
+      String(r.caller||"").toLowerCase().includes(c)).slice(-6).reverse();
+    const html=hist.length?hist.map(r=>{const s=r.snap||{};
+      const eg=s.smh_edge??s.bench_edge??s.edge;
+      return `${mdy(r.date)} $${esc(r.ticker)} T${esc(r.tier??"—")}${
+        s.ret!=null?` ${pp(s.ret).replace("pp","%")}`:""}${
+        eg!=null?` (edge ${pp(eg)})`:""}`}).join("<br>")
+      :"no graded picks in the recent window";
+    if(tr.insertAdjacentHTML)tr.insertAdjacentHTML("afterend",
+      `<tr class="drill"><td colspan="5" style="font-size:12.5px;color:var(--ink2)">${html}</td></tr>`);};});
   // 3D tilt on the hero card — hover-capable devices only, like the demo
   const hero=$("#hero");
   if(hero&&hero.addEventListener&&window.matchMedia&&window.matchMedia("(hover: hover)").matches){
@@ -659,8 +808,8 @@ async function sendAsk(){
 // tabs translates the track, so the neighbor physically slides into frame.
 // Inactive tabs collapse (height:0) AFTER the slide settles so the page's
 // scroll height belongs to the visible tab only.
-const ORDER=["home","book","fund","sig","radar","more"];
-let CUR="home",_collapseT=null;
+const ORDER=["today","home","book","fund","sig","radar","more"];
+let CUR="today",_collapseT=null;
 function _setTrack(idx,extraPx){
   const tr=$("#track");
   if(tr&&tr.style)tr.style.transform=
@@ -695,7 +844,7 @@ if(document.addEventListener){
   document.addEventListener("touchstart",e=>{
     const t=e.touches&&e.touches[0];if(!t)return;
     let blocked=e.target&&e.target.closest&&
-      !!e.target.closest("#tabs,input,textarea");
+      !!e.target.closest("#tabs,input,textarea,.chart");
     // a table only owns the gesture if it genuinely has sideways content to
     // pan — a list that fits the screen shouldn't eat the tab swipe
     if(!blocked&&e.target&&e.target.closest){
@@ -737,6 +886,21 @@ if(document.addEventListener){
   },{passive:true});
 }
 
+// ── offline shell + auto-refresh on return ──
+if(typeof navigator!=="undefined"&&"serviceWorker" in navigator){
+  try{navigator.serviceWorker.register("sw.js")}catch(e){}
+}
+let _lastRef=0;
+if(document.addEventListener){
+  document.addEventListener("visibilitychange",()=>{
+    const p=localStorage.getItem("mc_pass");
+    if(document.visibilityState==="visible"&&p&&DATA
+       &&Date.now()-_lastRef>60000){
+      _lastRef=Date.now();tryUnlock(p,false);
+    }
+  });
+}
+
 // ── gate wiring + instant-open (stale-while-revalidate) ──
 // With a remembered passcode, the LAST decrypted payload renders instantly
 // from cache while the fresh fetch + key-derivation runs in the background —
@@ -745,6 +909,7 @@ async function tryUnlock(pass,remember){
   try{
     const D=await unlock(pass);
     if(remember) localStorage.setItem("mc_pass",pass);
+    _lastRef=Date.now();
     try{localStorage.setItem("mc_cache",JSON.stringify(D))}catch(e){}
     $("#gate").style.display="none";$("#app").style.display="block";
     DATA=D;
