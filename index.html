@@ -166,7 +166,7 @@ function render(D){
     tiles.push(tile("Invested sleeve",pct(f.sleeve_return),vd,st));
     for(const s of ["SPY","SMH","RSP"]) if(bm[s]!=null){
       const e=(f.sleeve_return-bm[s])*100;
-      tiles.push(tile("vs "+s+" (matched)",pct(bm[s]),"edge "+pp(e),e>0?"good":"bad"));}}
+      tiles.push(tile("Edge vs "+s,pp(e),s+" itself: "+pct(bm[s])+" (same dollars, same days)",e>0?"good":"bad"));}}
   const rows=f.rows||[], inv=rows.reduce((a,r)=>a+(r.value||0),0);
   if(inv>0){const rk=[...rows].sort((a,b)=>b.value-a.value),
     t3=rk.slice(0,3).reduce((a,r)=>a+r.value,0)/inv*100, b0=rk[0].value/inv*100;
