@@ -535,7 +535,9 @@ function render(D){
     ${bookCurve(D.book)}</div>
     <div id="shed"></div>`;
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
-    return `<div class="card"><b class="tk">$${esc(h.ticker)}</b>
+    const si=h.si&&h.si.pct!=null
+      ?`<span class="etag ${h.si.pct>=15?"amber":"slate"}" style="margin-left:7px">🩳 ${h.si.pct}% short${h.si.rising?" ↑":""}</span>`:"";
+    return `<div class="card"><b class="tk">$${esc(h.ticker)}</b>${si}
     <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
     <details><summary>edit shares</summary>
     ${TOK?`<div style="display:flex;gap:8px;margin-top:8px">
