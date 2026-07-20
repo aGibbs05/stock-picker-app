@@ -674,7 +674,7 @@ function render(D){
     ${tokCard}${askCard}${remoteCard}
     <h2>Edit the system's files <span class="muted" style="font-weight:400">(saved straight from the app; the next run reads them)</span></h2>
     ${fileCards}
-    <h2>Pending asks</h2><div class="card">${asks?`<ul style="padding-left:18px">${asks}</ul>`:'<p class="muted">none queued</p>'}</div>
+    <h2>Pending asks</h2><div class="card" id="askpend">${asks?`<ul style="padding-left:18px">${asks}</ul>`:'<p class="muted">none queued</p>'}</div>
     <h2>13F queue</h2><div class="card">${q13?`<ul style="padding-left:18px">${q13}</ul>`:'<p class="muted">empty — next diff on Q2 filings (~mid-Aug)</p>'}</div>
     <h2>App</h2><div class="card"><p class="muted" style="font-size:13px">Tip: use your browser's "Add to Home Screen" so this opens like an app. Swipe left/right anywhere to change tabs.</p>
     <p style="margin-top:8px"><a href="${gh}/actions">🩺 Run status (view-only, opens GitHub)</a></p>
@@ -695,6 +695,7 @@ function render(D){
   const _o=$("#tokoff");if(_o)_o.onclick=ev=>{ev.preventDefault();
     TOK="";localStorage.removeItem("mc_tok");render(DATA)};
   const _a=$("#askgo");if(_a)_a.onclick=()=>sendAsk();
+  refreshAsks();   // async: swap the payload's ask list for the live file
   document.querySelectorAll(".hsave").forEach(b=>b.onclick=()=>saveOneShare(b.dataset.t));
   document.querySelectorAll(".gomore").forEach(a=>a.onclick=ev=>{
     ev.preventDefault();goTab("more")});
@@ -873,11 +874,28 @@ async function sendAsk(){
   try{
     const {text,sha}=await ghGet("Investing/asks.txt");
     await ghPut("Investing/asks.txt",text.replace(/\s*$/,"\n")+v+"\n",sha,"app: new ask");
-    const t=v.split(/[\s—|]+/)[0].toUpperCase().replace(/^\$/,"");
-    (DATA.asks=DATA.asks||[]).push({ticker:t,note:v});
-    render(DATA);
-    const m2=$("#askmsg");if(m2)m2.textContent="queued ✓ — tomorrow morning's run researches it";
+    $("#askin").value="";
+    m.textContent="queued ✓ — the next run researches it";
+    refreshAsks();
   }catch(e){m.textContent=e.message}
+}
+
+async function refreshAsks(){
+  // The payload's ask list is only as fresh as the last publish — with a key
+  // on this phone, show the LIVE asks.txt instead. (Fixes "adding QCOM took
+  // off AMD": a background payload refresh was visually hiding asks added
+  // since the last run; the file itself always had both. 2026-07-20)
+  if(!TOK)return;
+  const box=$("#askpend");if(!box)return;
+  try{
+    const {text}=await ghGet("Investing/asks.txt");
+    const lines=text.split(/\r?\n/).map(s=>s.trim())
+      .filter(s=>s&&!s.startsWith("#"));
+    box.innerHTML=lines.length
+      ?`<ul style="padding-left:18px">${lines.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>
+        <p class="muted" style="font-size:11.5px;margin-top:6px">live from asks.txt</p>`
+      :'<p class="muted">none queued</p>';
+  }catch(e){/* keep the payload view — stale beats broken */}
 }
 
 // ── tabs: sliding track + finger-following swipe ──
