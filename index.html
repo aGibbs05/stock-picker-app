@@ -567,12 +567,15 @@ function render(D){
   // names without a count still list, they just can't be valued.
   const gh0="https://github.com/aGibbs05/stock-picker";
   const ph=D.personal||[];
-  let bookTot=0,bookN=0,noQuote=0;
+  let bookTot=0,bookN=0,noQuote=0,bookCost=0,bookCostVal=0,bookCostN=0;
   for(const h of ph){
-    if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;}
+    if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;
+      if(h.cost>0){bookCost+=h.shares*h.cost;bookCostVal+=h.shares*h.quote;bookCostN++;}}
     else if(h.shares!=null) noQuote++;}
   const bookHead=`<div class="card"><div class="l" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;font-weight:500;color:var(--muted)">Your book${bookN<ph.length?" (partial)":""}</div>
     <div class="bignum">${bookN?usd(bookTot):"—"}</div>
+    ${bookCost>0?(()=>{const pl=bookCostVal-bookCost,r=pl/bookCost*100;
+      return `<div class="${pl>=0?"good":"bad"}" style="font-size:13px;font-weight:600;margin-top:2px">${pl>=0?"+":"−"}${usd(Math.abs(pl))} (${r>=0?"+":""}${r.toFixed(1)}%) vs what you paid${bookCostN<bookN?` <span class="muted" style="font-weight:400">(${bookCostN} of ${bookN} with an avg cost)</span>`:""}</div>`})():""}
     <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
     ${TOK?`<a href="#" id="editsh" style="font-weight:600">✎ edit shares in app</a>`
          :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div>
@@ -583,7 +586,7 @@ function render(D){
     const si=h.si&&h.si.pct!=null
       ?`<span class="etag ${h.si.pct>=15?"amber":"slate"}" style="margin-left:7px">🩳 ${h.si.pct}% short${h.si.rising?" ↑":""}</span>`:"";
     return `<div class="card"><b class="tk">$${esc(h.ticker)}</b>${si}
-    <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
+    <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return `<div class="${r>=0?"good":"bad"}" style="font-size:11.5px;font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</div>`})():""}`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
     <details><summary>edit shares</summary>
     ${TOK?`<div style="display:flex;gap:8px;margin-top:8px">
       <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1">
@@ -800,7 +803,7 @@ function render(D){
 }
 
 // ── in-app editors ─────────────────────────────────────────────────────────
-function sweepNewRow(rows,tRaw,sRaw){
+function sweepNewRow(rows,tRaw,sRaw,cRaw){
   // Pull the Add-row inputs into `rows`. ok:false = BLOCK the action and show
   // err (never silently drop what the user typed). Empty box = nothing to do.
   const raw=String(tRaw||"").trim();
@@ -810,7 +813,7 @@ function sweepNewRow(rows,tRaw,sRaw){
     return{ok:false,err:`didn't save — "${raw}" isn't a ticker (1-6 letters; put the share count in the second box)`};
   if(rows.some(r=>r.t===t))
     return{ok:false,err:"didn't save — "+t+" is already in the list above"};
-  rows.push({t,s:String(sRaw||"").trim()});
+  rows.push({t,s:String(sRaw||"").trim(),c:String(cRaw||"").trim()});
   return{ok:true,added:true};
 }
 function parseHoldings(text){
@@ -820,7 +823,7 @@ function parseHoldings(text){
     const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
     if(!p.length) continue;
     const t=p[0].toUpperCase().replace(/^\$/,"");
-    if(t&&t.length<=6) rows.push({t,s:p[1]||""});
+    if(t&&t.length<=6) rows.push({t,s:p[1]||"",c:p[2]||""});
   }
   return {head,rows};
 }
@@ -839,22 +842,26 @@ function drawShares(ed,rows){
   ed.innerHTML=`<div class="card"><b>Edit share counts</b>
    <div class="muted" style="font-size:12.5px;margin-top:2px">blank = tracked but not valued · ✕ removes the holding entirely (surveillance stops)</div>
    ${rows.map((r,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-     <b style="width:74px">$${esc(r.t)}</b>
-     <input class="shin inp" data-i="${i}" type="text" inputmode="decimal" value="${esc(r.s)}" placeholder="shares" style="flex:1">
+     <b style="width:64px">$${esc(r.t)}</b>
+     <input class="shin inp" data-i="${i}" type="text" inputmode="decimal" value="${esc(r.s)}" placeholder="shares" style="flex:1;min-width:0">
+     <input class="shcin inp" data-i="${i}" type="text" inputmode="decimal" value="${esc(r.c)}" placeholder="avg $ paid" style="flex:1;min-width:0">
      <a href="#" class="shdel" data-i="${i}" style="color:var(--bad);padding:4px 8px;text-decoration:none">✕</a></div>`).join("")}
    <div style="display:flex;gap:8px;margin-top:12px">
-     <input id="newt" class="inp" placeholder="TICKER" autocapitalize="characters" style="width:92px">
-     <input id="news" class="inp" placeholder="shares" inputmode="decimal" style="flex:1">
+     <input id="newt" class="inp" placeholder="TICKER" autocapitalize="characters" style="width:76px">
+     <input id="news" class="inp" placeholder="shares" inputmode="decimal" style="flex:1;min-width:0">
+     <input id="newc" class="inp" placeholder="avg $ paid" inputmode="decimal" style="flex:1;min-width:0">
      <button id="shadd" class="bs">Add</button></div>
    <div style="display:flex;gap:8px;margin-top:12px">
      <button id="shsave" class="bp" style="flex:1">Save</button>
      <button id="shx" class="bs">Cancel</button></div>
    <div id="shmsg" class="muted" style="font-size:12.5px;margin-top:8px"></div></div>`;
-  const grab=()=>{document.querySelectorAll(".shin").forEach(x=>{ed._rows[+x.dataset.i].s=x.value.trim()})};
+  const grab=()=>{
+    document.querySelectorAll(".shin").forEach(x=>{ed._rows[+x.dataset.i].s=x.value.trim()});
+    document.querySelectorAll(".shcin").forEach(x=>{ed._rows[+x.dataset.i].c=x.value.trim()})};
   document.querySelectorAll(".shdel").forEach(a=>a.onclick=e=>{e.preventDefault();grab();
     ed._rows.splice(+a.dataset.i,1);drawShares(ed,ed._rows)});
   $("#shadd").onclick=()=>{grab();
-    const res=sweepNewRow(ed._rows,$("#newt").value,$("#news").value);
+    const res=sweepNewRow(ed._rows,$("#newt").value,$("#news").value,$("#newc").value);
     if(!res.ok){$("#shmsg").textContent=res.err;return}
     if(res.added)drawShares(ed,ed._rows)};
   $("#shx").onclick=()=>{ed.innerHTML=""};
@@ -864,14 +871,16 @@ function drawShares(ed,rows){
     // there and tapped Save — the old code silently ignored it and "saved"
     // the unchanged list; every add attempt vanished without an error)
     const res=sweepNewRow(ed._rows,$("#newt")?$("#newt").value:"",
-                          $("#news")?$("#news").value:"");
+                          $("#news")?$("#news").value:"",
+                          $("#newc")?$("#newc").value:"");
     if(!res.ok){$("#shmsg").textContent=res.err;return}
     $("#shmsg").textContent="saving to GitHub…";
     try{
       const head=ed._head.length?ed._head:
         ["# Anthony's personal holdings — TICKER [shares]; # = comment.",
          "# Edited from the Mission Control app."];
-      const body=ed._rows.map(r=>r.s?`${r.t} ${r.s}`:r.t);
+      // 'TICK shares cost' — cost is only meaningful alongside a share count
+      const body=ed._rows.map(r=>r.s?(r.c?`${r.t} ${r.s} ${r.c}`:`${r.t} ${r.s}`):r.t);
       await ghPut("Investing/holdings.txt",[...head,...body,""].join("\n"),
                   ed._sha,"app: update holdings/share counts");
       // sha refresh: without this, a SECOND save from the same open editor
@@ -884,7 +893,7 @@ function drawShares(ed,rows){
       // reflect immediately: keep known quotes, swap in the new share counts
       const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
       DATA.personal=ed._rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
-        ticker:r.t,shares:r.s?parseFloat(r.s):null}));
+        ticker:r.t,shares:r.s?parseFloat(r.s):null,cost:r.c?parseFloat(r.c):null}));
       render(DATA);
       $("#shmsg")&&($("#shmsg").textContent="saved ✓");
     }catch(e){
@@ -916,7 +925,9 @@ async function saveOneShare(t){
     const out=text.split("\n").map(line=>{
       const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
       if(p.length&&p[0].toUpperCase().replace(/^\$/,"")===t){
-        found=true;return val?`${t} ${val}`:t;}
+        found=true;
+        // keep the avg-cost token (p[2], 2026-07-21) when editing shares
+        return val?(p[2]?`${t} ${val} ${p[2]}`:`${t} ${val}`):t;}
       return line;});
     if(!found)out.push(val?`${t} ${val}`:t);
     await ghPut("Investing/holdings.txt",out.join("\n"),sha,
