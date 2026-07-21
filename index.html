@@ -369,7 +369,11 @@ function perfChart(D){
   const collect=(arr,key)=>{(arr||[]).forEach(p=>{
     if(p&&p[key]!=null&&p.date){const t=Date.parse(p.date);
       if(isFinite(t))rawTs.push(t)}})};
-  collect(f.snapshots,"equity");collect(D.book,"value");
+  // book line = time-weighted index when the payload has it (deposits/new
+  // holdings move the base, never the line — Anthony 2026-07-21); the raw
+  // dollar series stays on the Book tab
+  const bookPerf=(D.book_idx&&D.book_idx.length>=2)?D.book_idx:D.book;
+  collect(f.snapshots,"equity");collect(bookPerf,"value");
   collect((D.bench||{}).SPY,"close");collect((D.bench||{}).SMH,"close");
   const tmax=rawTs.length?Math.max(...rawTs):0;
   const cut=CHART_RANGE==="all"?-Infinity:tmax-(+CHART_RANGE)*864e5;
@@ -380,7 +384,7 @@ function perfChart(D){
     return pts.length>=2?pts.map(p=>({t:p.t,r:p.v/pts[0].v*100})):null;};
   const defs=[
     ["Fund","url(#cg)","#3b82f6",2.5,prep(f.snapshots,"equity")],
-    ["Your book","var(--cBook)","var(--cBook)",2,prep(D.book,"value")],
+    ["Your book","var(--cBook)","var(--cBook)",2,prep(bookPerf,"value")],
     ["SPY","var(--cSpy)","var(--cSpy)",2,prep((D.bench||{}).SPY,"close")],
     ["SMH","var(--cSmh)","var(--cSmh)",2,prep((D.bench||{}).SMH,"close")]];
   const series=defs.filter(d=>d[4])
@@ -543,7 +547,8 @@ function render(D){
     tiles.push(tile("Concentration",t3.toFixed(0)+"%",
       `in top 3 of ${rk.length} · largest ${esc(rk[0].ticker)} ${b0.toFixed(0)}%`,b0>30?"warn":""));}
   // You vs the fund (needs 2+ book points — appears once history accumulates)
-  const bk=(D.book||[]).filter(p=>p&&p.value!=null&&p.date);
+  const bk=((D.book_idx&&D.book_idx.length>=2)?D.book_idx:D.book||[])
+    .filter(p=>p&&p.value!=null&&p.date);
   if(bk.length>=2){
     const b0=bk[0],b1=bk[bk.length-1],bret=(b1.value/b0.value-1)*100;
     const fs=(f.snapshots||[]).filter(s=>s&&s.equity!=null&&s.date>=b0.date);
@@ -571,7 +576,8 @@ function render(D){
     <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
     ${TOK?`<a href="#" id="editsh" style="font-weight:600">✎ edit shares in app</a>`
          :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div>
-    ${bookCurve(D.book)}</div>
+    ${bookCurve(D.book)}
+    ${(D.book_idx&&D.book_idx.length>=2)?`<div class="muted" style="font-size:11px;margin-top:4px">dollar curve — money you add moves it. The Home chart's book line is deposit-proof (time-weighted).</div>`:""}</div>
     <div id="shed"></div>`;
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     const si=h.si&&h.si.pct!=null
