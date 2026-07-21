@@ -794,6 +794,19 @@ function render(D){
 }
 
 // ── in-app editors ─────────────────────────────────────────────────────────
+function sweepNewRow(rows,tRaw,sRaw){
+  // Pull the Add-row inputs into `rows`. ok:false = BLOCK the action and show
+  // err (never silently drop what the user typed). Empty box = nothing to do.
+  const raw=String(tRaw||"").trim();
+  if(!raw)return{ok:true,added:false};
+  const t=raw.toUpperCase().replace(/^\$/,"");
+  if(!/^[A-Z.]{1,6}$/.test(t))
+    return{ok:false,err:`didn't save — "${raw}" isn't a ticker (1-6 letters; put the share count in the second box)`};
+  if(rows.some(r=>r.t===t))
+    return{ok:false,err:"didn't save — "+t+" is already in the list above"};
+  rows.push({t,s:String(sRaw||"").trim()});
+  return{ok:true,added:true};
+}
 function parseHoldings(text){
   const head=[],rows=[];
   for(const line of text.split("\n")){
@@ -835,13 +848,19 @@ function drawShares(ed,rows){
   document.querySelectorAll(".shdel").forEach(a=>a.onclick=e=>{e.preventDefault();grab();
     ed._rows.splice(+a.dataset.i,1);drawShares(ed,ed._rows)});
   $("#shadd").onclick=()=>{grab();
-    const t=$("#newt").value.trim().toUpperCase().replace(/^\$/,"");
-    if(!/^[A-Z.]{1,6}$/.test(t)){$("#shmsg").textContent="ticker should be 1-6 letters";return}
-    if(ed._rows.some(r=>r.t===t)){$("#shmsg").textContent=t+" is already listed";return}
-    ed._rows.push({t,s:$("#news").value.trim()});drawShares(ed,ed._rows)};
+    const res=sweepNewRow(ed._rows,$("#newt").value,$("#news").value);
+    if(!res.ok){$("#shmsg").textContent=res.err;return}
+    if(res.added)drawShares(ed,ed._rows)};
   $("#shx").onclick=()=>{ed.innerHTML=""};
   $("#shsave").onclick=async()=>{
-    grab();$("#shmsg").textContent="saving to GitHub…";
+    grab();
+    // Save sweeps the Add row in (Anthony 2026-07-21: he typed the new ticker
+    // there and tapped Save — the old code silently ignored it and "saved"
+    // the unchanged list; every add attempt vanished without an error)
+    const res=sweepNewRow(ed._rows,$("#newt")?$("#newt").value:"",
+                          $("#news")?$("#news").value:"");
+    if(!res.ok){$("#shmsg").textContent=res.err;return}
+    $("#shmsg").textContent="saving to GitHub…";
     try{
       const head=ed._head.length?ed._head:
         ["# Anthony's personal holdings — TICKER [shares]; # = comment.",
@@ -852,6 +871,10 @@ function drawShares(ed,rows){
       // sha refresh: without this, a SECOND save from the same open editor
       // (e.g. adding a 19th holding after a first save) 409s forever
       try{ed._sha=(await ghGet("Investing/holdings.txt")).sha}catch(_){}
+      // kick the free data refresh so the new holding gets valued into the
+      // payload in ~2 min (best-effort; publish.yml cancels stale runs)
+      fetch(`https://api.github.com/repos/${REPO}/actions/workflows/publish.yml/dispatches`,
+        {method:"POST",headers:ghH(),body:JSON.stringify({ref:"main"})}).catch(()=>{});
       // reflect immediately: keep known quotes, swap in the new share counts
       const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
       DATA.personal=ed._rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
