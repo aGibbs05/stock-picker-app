@@ -158,6 +158,16 @@ tr.drill td{background:var(--tile)}
 .etag.blue{color:var(--tick);background:var(--timebg)}
 .sdot{display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:7px;
  vertical-align:1px}
+/* Today tab report typography (2026-07-21 rework) */
+.ep{margin:8px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink2);
+ word-break:break-word}
+.elbl{display:inline-block;margin-right:4px;color:var(--ink);
+ font:600 11.5px var(--disp);letter-spacing:.04em;text-transform:uppercase}
+.ebul{padding-left:14px;position:relative}
+.ebul::before{content:"▪";position:absolute;left:1px;color:var(--muted);
+ font-size:10px}
+.emono{margin:8px 0 0;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;
+ white-space:pre;color:var(--ink2)}
 /* Radar event cards */
 .ecard{position:relative;overflow:hidden;display:flex;gap:12px;align-items:flex-start;
  background:var(--card);border-radius:14px;box-shadow:var(--shadow);
@@ -450,6 +460,35 @@ function setRing(f){
   if(arc&&arc.style)arc.style.strokeDashoffset=(125.66-(p==null?0:125.66*p/100)).toFixed(2);
 }
 
+function fmtInline(s){
+  // escape, then give $TICKERs their app-wide blue
+  return esc(s).replace(/\$([A-Z][A-Z.]{0,5})\b/g,'<b class="tk">$$$1</b>');
+}
+function fmtBody(lines){
+  // Typeset a report section for a phone (2026-07-21 rework — the raw
+  // monospace dump was dense/cut-off): labeled paragraphs (WHY: / RISK: …)
+  // get bold labels + proportional text, status/bullet lines stay one-per-
+  // line, hard-wrapped prose re-flows, and only genuinely tabular content
+  // (2+ multi-space column gaps) keeps monospace inside its own scroller.
+  const out=[];let tbl=[],para=[];
+  const flushT=()=>{if(tbl.length){out.push(`<div class="scroll"><pre class="emono">${esc(tbl.join("\n"))}</pre></div>`);tbl=[]}};
+  const flushP=()=>{if(para.length){out.push(`<p class="ep">${fmtInline(para.join(" "))}</p>`);para=[]}};
+  for(const raw of lines){
+    const l=raw.replace(/\s+$/,""),t=l.trim();
+    if(!t){flushT();flushP();continue}
+    if(/\S\s{2,}\S+\s{2,}\S/.test(l)){flushP();tbl.push(l);continue}
+    flushT();
+    const lab=t.match(/^([A-Z][A-Za-z '’&/-]{1,26}):\s+(.+)/);
+    const bul=/^[•·▪‣-]\s+/.test(t);
+    const stat=/^(🔴|🟢|🟡|🔵|⚠️|⚠|⏳|🩳|⚡|✅|❌|▸|⛔)/u.test(t);
+    if(lab){flushP();out.push(`<p class="ep"><b class="elbl">${esc(lab[1])}</b> ${fmtInline(lab[2])}</p>`)}
+    else if(bul){flushP();out.push(`<p class="ep ebul">${fmtInline(t.replace(/^[•·▪‣-]\s+/,""))}</p>`)}
+    else if(stat){flushP();out.push(`<p class="ep">${fmtInline(t)}</p>`)}
+    else para.push(t);
+  }
+  flushT();flushP();
+  return out.join("");
+}
 function emailCards(e){
   // split a sent report into cards at its "── SECTION ──" headers
   const secs=[];let cur={h:"",lines:[]};
@@ -464,7 +503,7 @@ function emailCards(e){
     :/FUND/i.test(h)?"#8b5cf6":/ASK|GAUNTLET|EARNINGS|CAMPING/i.test(h)?"#b45309"
     :"#6b7280";
   return secs.map(s=>`<div class="card">${s.h?`<b style="font:600 14px var(--disp)"><span class="sdot" style="background:${dotFor(s.h)}"></span>${esc(s.h)}</b>`:""}
-    <pre style="margin:${s.h?"8px":"0"} 0 0;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;color:var(--ink2)">${esc(s.lines.join("\n").trim())}</pre></div>`).join("");
+    ${fmtBody(s.lines)}</div>`).join("");
 }
 
 function render(D){
@@ -626,6 +665,8 @@ function render(D){
     <td class="num">${c.trusted?c.weight.toFixed(2):'<span class="muted">1.00*</span>'}</td></tr>`).join("");
   $("#t-sig").innerHTML=`<h2>Camping watch <span class="muted" style="font-weight:400">(10+ = the validated setup)</span></h2>
     ${camps||'<div class="card"><p class="muted">No caller is building a position yet.</p></div>'}
+    ${(()=>{const shown=(D.camping||[]).length,all=D.camping_tracked||0;
+      return all>shown?`<p class="muted" style="font-size:12px;margin:6px 2px 0">…plus ${all-shown} more name${all-shown>1?"s":""} tracked below the 3-mention bar — every caller's calls counted, held or not</p>`:""})()}
     <h2>Track record (latest 30 audited)</h2><div class="card scroll">${track?`<table><thead><tr><th>Date</th><th>Name</th><th class="num">Tier</th><th class="num">Ret</th><th class="num">Edge</th></tr></thead>${track}</table>`:'<p class="muted">—</p>'}</div>
     <h2>Caller scoreboard</h2><div class="card scroll">${callers?`<table><thead><tr><th>Caller</th><th class="num">n</th><th class="num">Hit</th><th class="num">Edge</th><th class="num">Wt</th></tr></thead>${callers}</table><p class="muted" style="font-size:11.5px;margin-top:6px">* weight neutral until 6+ picks mature 30d (~mid-Aug)</p>`:'<p class="muted">accumulating — first stats ~mid-Aug</p>'}</div>`;
 
@@ -665,7 +706,8 @@ function render(D){
   const remoteCard=TOK
     ?`<div class="card"><b>🕹 Remote control</b>
       <div class="muted" style="font-size:12.5px;margin-top:2px">kicks off the GitHub workflow — email + app data land in ~5-10 min</div>
-      <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="bs wdis" data-w="publish.yml" style="width:100%;margin-top:10px">↻ Refresh prices &amp; graphs (free)</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
         <button class="bs wdis" data-w="daily.yml" style="flex:1">Run the picker (~$1)</button>
         <button class="bs wdis" data-w="weekly.yml" style="flex:1">Send digest (~$0.50)</button></div>
       <div id="wmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
@@ -707,10 +749,10 @@ function render(D){
   // remote control: two-tap confirm, then a workflow_dispatch via the token
   document.querySelectorAll(".wdis").forEach(b=>b.onclick=async()=>{
     const m=$("#wmsg");
-    if(!b._armed){b._armed=true;b.textContent="Tap again to confirm";
+    if(!b._armed){b._armed=true;b._lbl=b.textContent;b.textContent="Tap again to confirm";
       b.style.color="var(--warn)";b.style.borderColor="var(--warn)";
       setTimeout(()=>{if(b._armed){b._armed=false;
-        b.textContent=b.dataset.w==="daily.yml"?"Run the picker (~$1)":"Send digest (~$0.50)";
+        b.textContent=b._lbl;
         b.style.color="";b.style.borderColor="";}},4000);
       return;}
     b._armed=false;
@@ -719,9 +761,11 @@ function render(D){
       const r=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${b.dataset.w}/dispatches`,
         {method:"POST",headers:ghH(),body:JSON.stringify({ref:"main"})});
       if(r.status!==204)throw new Error("dispatch failed ("+r.status+")");
-      if(m)m.textContent="started ✓ — the email arrives in ~5-10 min; the app refreshes after";
+      if(m)m.textContent=b.dataset.w==="publish.yml"
+        ?"started ✓ — fresh prices in ~2-3 min ($0); pull down / reopen the app after"
+        :"started ✓ — the email arrives in ~5-10 min; the app refreshes after";
     }catch(e){if(m)m.textContent=e.message}
-    b.textContent=b.dataset.w==="daily.yml"?"Run the picker (~$1)":"Send digest (~$0.50)";
+    b.textContent=b._lbl||b.textContent;
     b.style.color="";b.style.borderColor="";});
   // caller drill-down: tap a scoreboard row for that caller's graded picks
   document.querySelectorAll(".crow").forEach(tr=>{tr.onclick=()=>{
@@ -750,19 +794,23 @@ function render(D){
 }
 
 // ── in-app editors ─────────────────────────────────────────────────────────
+function parseHoldings(text){
+  const head=[],rows=[];
+  for(const line of text.split("\n")){
+    if(!rows.length&&line.trim().startsWith("#")){head.push(line);continue;}
+    const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
+    if(!p.length) continue;
+    const t=p[0].toUpperCase().replace(/^\$/,"");
+    if(t&&t.length<=6) rows.push({t,s:p[1]||""});
+  }
+  return {head,rows};
+}
 async function openShares(){
   const ed=$("#shed");
   ed.innerHTML='<div class="card muted">loading holdings…</div>';
   try{
     const {text,sha}=await ghGet("Investing/holdings.txt");
-    const head=[],rows=[];
-    for(const line of text.split("\n")){
-      if(!rows.length&&line.trim().startsWith("#")){head.push(line);continue;}
-      const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
-      if(!p.length) continue;
-      const t=p[0].toUpperCase().replace(/^\$/,"");
-      if(t&&t.length<=6) rows.push({t,s:p[1]||""});
-    }
+    const {head,rows}=parseHoldings(text);
     ed._head=head;ed._sha=sha;
     drawShares(ed,rows);
   }catch(e){ed.innerHTML=`<div class="card" style="color:var(--bad)">${esc(e.message)}</div>`}
@@ -801,13 +849,29 @@ function drawShares(ed,rows){
       const body=ed._rows.map(r=>r.s?`${r.t} ${r.s}`:r.t);
       await ghPut("Investing/holdings.txt",[...head,...body,""].join("\n"),
                   ed._sha,"app: update holdings/share counts");
+      // sha refresh: without this, a SECOND save from the same open editor
+      // (e.g. adding a 19th holding after a first save) 409s forever
+      try{ed._sha=(await ghGet("Investing/holdings.txt")).sha}catch(_){}
       // reflect immediately: keep known quotes, swap in the new share counts
       const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
       DATA.personal=ed._rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
         ticker:r.t,shares:r.s?parseFloat(r.s):null}));
       render(DATA);
       $("#shmsg")&&($("#shmsg").textContent="saved ✓");
-    }catch(e){$("#shmsg").textContent=e.message}};
+    }catch(e){
+      if(/409|422/.test(e.message||"")){
+        // stale editor (another save landed since it opened) — resync from
+        // the live file, KEEP any tickers added here, ask for one more tap
+        try{
+          const fresh=await ghGet("Investing/holdings.txt");
+          const fp=parseHoldings(fresh.text);
+          const have=new Set(fp.rows.map(r=>r.t));
+          const added=ed._rows.filter(r=>!have.has(r.t));
+          ed._head=fp.head;ed._sha=fresh.sha;
+          drawShares(ed,[...fp.rows,...added]);
+          $("#shmsg").textContent="the file changed since this editor opened — re-synced (your added tickers kept). Check the numbers, tap Save again.";
+        }catch(e2){$("#shmsg").textContent=e2.message}
+      }else $("#shmsg").textContent=e.message}};
 }
 
 async function saveOneShare(t){
