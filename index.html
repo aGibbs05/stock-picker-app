@@ -373,7 +373,10 @@ function perfChart(D){
   // holdings move the base, never the line — Anthony 2026-07-21); the raw
   // dollar series stays on the Book tab
   const bookPerf=(D.book_idx&&D.book_idx.length>=2)?D.book_idx:D.book;
-  collect(f.snapshots,"equity");collect(bookPerf,"value");
+  // fund line likewise: flow-adjusted index when present (top-ups move the
+  // base, never the line); raw equity for old payloads
+  const fundPerf=(D.fund_idx&&D.fund_idx.length>=2)?D.fund_idx:null;
+  collect(fundPerf||f.snapshots,fundPerf?"value":"equity");collect(bookPerf,"value");
   collect((D.bench||{}).SPY,"close");collect((D.bench||{}).SMH,"close");
   const tmax=rawTs.length?Math.max(...rawTs):0;
   const cut=CHART_RANGE==="all"?-Infinity:tmax-(+CHART_RANGE)*864e5;
@@ -383,7 +386,7 @@ function perfChart(D){
       .filter(p=>isFinite(p.t)&&p.v>0&&p.t>=cut).sort((a,b)=>a.t-b.t);
     return pts.length>=2?pts.map(p=>({t:p.t,r:p.v/pts[0].v*100})):null;};
   const defs=[
-    ["Fund","url(#cg)","#3b82f6",2.5,prep(f.snapshots,"equity")],
+    ["Fund","url(#cg)","#3b82f6",2.5,fundPerf?prep(fundPerf,"value"):prep(f.snapshots,"equity")],
     ["Your book","var(--cBook)","var(--cBook)",2,prep(bookPerf,"value")],
     ["SPY","var(--cSpy)","var(--cSpy)",2,prep((D.bench||{}).SPY,"close")],
     ["SMH","var(--cSmh)","var(--cSmh)",2,prep((D.bench||{}).SMH,"close")]];
@@ -551,9 +554,12 @@ function render(D){
     .filter(p=>p&&p.value!=null&&p.date);
   if(bk.length>=2){
     const b0=bk[0],b1=bk[bk.length-1],bret=(b1.value/b0.value-1)*100;
-    const fs=(f.snapshots||[]).filter(s=>s&&s.equity!=null&&s.date>=b0.date);
+    // flow-adjusted fund side when the payload has it (top-up can't fake it)
+    const fsrc=(D.fund_idx&&D.fund_idx.length>=2)
+      ?{arr:D.fund_idx,key:"value"}:{arr:f.snapshots||[],key:"equity"};
+    const fs=fsrc.arr.filter(s=>s&&s[fsrc.key]!=null&&s.date>=b0.date);
     if(fs.length>=2){
-      const fret=(fs[fs.length-1].equity/fs[0].equity-1)*100,lead=bret-fret;
+      const fret=(fs[fs.length-1][fsrc.key]/fs[0][fsrc.key]-1)*100,lead=bret-fret;
       tiles.push(tile("You vs the fund",
         (lead>=0?"You +":"Fund +")+Math.abs(lead).toFixed(1)+"pp",
         `since ${esc(b0.date)} · you ${pct(bret/100)} vs fund ${pct(fret/100)}`,
