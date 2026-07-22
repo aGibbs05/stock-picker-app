@@ -674,8 +674,7 @@ function render(D){
       ${wSec("4 · Is the business strong?",w.strong)}
       ${wSec("5 · Financial health",w.financial)}
       ${wSec("6 · Biggest risk",w.risk)}
-      ${wSec("7 · Bull case",w.bull)}
-      ${wSec("7 · Bear case",w.bear)}
+      ${wSec("7 · Bull vs bear case",[...(w.bull||[]).map(x=>"Bull — "+x),...(w.bear||[]).map(x=>"Bear — "+x)])}
       ${wSec("8 · Final takeaway",w.takeaway)}
     </details></div>`}).join("");
   const wChips=wq.filter(t=>!wu[t]).map(t=>
