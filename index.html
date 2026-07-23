@@ -973,12 +973,12 @@ function computeTrade(rows,side,tRaw,priceRaw,dollarsRaw,sharesRaw){
   if(!/^[A-Z.]{1,6}$/.test(t))return{ok:false,err:`"${tRaw}" isn't a ticker (1-6 letters)`};
   const px=parseFloat(String(priceRaw).replace(/[$,]/g,""));
   if(!(px>0))return{ok:false,err:"enter the price per share (your fill price)"};
-  let sh=parseFloat(String(sharesRaw).replace(/,/g,""));
+  // "ALL" sentinel (2026-07-23): sell the exact live-file share count — no
+  // typing decimals, and immune to a stale displayed number
+  const sellAll=side==="sell"&&/^all$/i.test(String(sharesRaw||"").trim());
+  let sh=sellAll?0:parseFloat(String(sharesRaw).replace(/,/g,""));
   let usd_=parseFloat(String(dollarsRaw).replace(/[$,]/g,""));
-  if(!(sh>0)&&!(usd_>0))return{ok:false,err:"enter dollars OR shares (either one)"};
-  if(!(sh>0))sh=usd_/px;
-  usd_=sh*px;
-  sh=Math.round(sh*1e6)/1e6;
+  if(!sellAll&&!(sh>0)&&!(usd_>0))return{ok:false,err:"enter dollars OR shares (either one), or tap Sell ALL"};
   const out=rows.map(r=>({...r}));
   const i=out.findIndex(r=>r.t===t);
   let summary="",newTicker=false,avgWarn=false;
@@ -986,12 +986,19 @@ function computeTrade(rows,side,tRaw,priceRaw,dollarsRaw,sharesRaw){
     if(i<0)return{ok:false,err:`you don't hold ${t}`};
     const held=parseFloat(out[i].s||"0");
     if(!(held>0))return{ok:false,err:`${t} has no share count on file — set it in the holding's edit box first`};
+    if(sellAll)sh=held;
+    if(!(sh>0))sh=usd_/px;
+    usd_=sh*px;
+    sh=Math.round(sh*1e6)/1e6;
     if(sh>held+1e-6)return{ok:false,err:`you only hold ${held} sh of ${t}`};
     if(sh>=held-1e-6){out.splice(i,1);
       summary=`SELL ALL ${held} sh ${t} @ ${usd(px)} = ${usd(held*px)} — position closed, card removed`;}
     else{const left=Math.round((held-sh)*1e6)/1e6;out[i].s=String(left);
       summary=`SELL ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — ${left} sh remain, avg unchanged${out[i].c?` (${usd(parseFloat(out[i].c))})`:""}`;}
   }else{
+    if(!(sh>0))sh=usd_/px;
+    usd_=sh*px;
+    sh=Math.round(sh*1e6)/1e6;
     if(i<0){out.push({t,s:String(sh),c:String(Math.round(px*1e4)/1e4)});newTicker=true;
       summary=`BUY ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — NEW holding, avg ${usd(px)}`;}
     else{const held=parseFloat(out[i].s||"0")||0;
@@ -1014,7 +1021,8 @@ function openTrade(){
   ed.innerHTML=`<div class="card"><b>⇄ Record a trade</b> <span class="muted" style="font-size:12px">paper mirror of what you did in Robinhood — updates your book + ledger</span>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="tside_b" class="bp" style="flex:1">Buy</button>
-      <button id="tside_s" class="bs" style="flex:1">Sell</button></div>
+      <button id="tside_s" class="bs" style="flex:1">Sell</button>
+      <button id="tside_all" class="bs" style="flex:1">Sell ALL</button></div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <input id="ttk" class="inp" placeholder="TICKER" autocapitalize="characters" style="width:86px">
       <input id="tpx" class="inp" placeholder="price / share" inputmode="decimal" style="flex:1;min-width:0"></div>
@@ -1031,6 +1039,9 @@ function openTrade(){
     const g=$("#tgo");if(g)g.textContent="Preview";};
   $("#tside_b").onclick=()=>{side="buy";paint()};
   $("#tside_s").onclick=()=>{side="sell";paint()};
+  $("#tside_all").onclick=()=>{side="sell";paint();
+    const s2=$("#tsh"),u2=$("#tusd");if(s2)s2.value="ALL";if(u2)u2.value="";
+    $("#tgo").click();};   // straight to the preview; Confirm still required
   const _tk2=$("#ttk");if(_tk2)_tk2.oninput=()=>{staged=null;$("#tgo").textContent="Preview";
     const h=(DATA.personal||[]).find(x=>x.ticker===_tk2.value.trim().toUpperCase().replace(/^\$/,""));
     if(h&&h.quote&&!$("#tpx").value)$("#tpx").value=h.quote;};
