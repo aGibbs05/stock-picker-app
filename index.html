@@ -593,12 +593,16 @@ function render(D){
   if(f.sleeve_return!=null){
     const eS=bm.SPY!=null?(f.sleeve_return-bm.SPY)*100:null,
           eM=bm.SMH!=null?(f.sleeve_return-bm.SMH)*100:null;
-    let st="",vd="early data";
+    let vd="early data";
     if(eS!=null&&eM!=null){
-      if(eS>0&&eM>0){st="good";vd="beating market + AI sector"}
-      else if(eS>0){st="warn";vd="beating SPY, trailing SMH (beta)"}
-      else{st="bad";vd="trailing the market"}}
-    tiles.push(tile("Invested sleeve",pct(f.sleeve_return),vd,st));
+      if(eS>0&&eM>0)vd="still beating same-$ SPY + SMH ✓";
+      else if(eS>0)vd="beating SPY, trailing SMH (beta)";
+      else vd="trailing the market"}
+    // number colored by ITS OWN SIGN; the relative verdict lives in words +
+    // the Edge tiles next door (Anthony 2026-07-24: a green −1.6% reads wrong)
+    tiles.push(tile("Invested sleeve",pct(f.sleeve_return),
+      "positions vs their cost · "+vd,
+      f.sleeve_return>=0?"good":"bad"));
     for(const s of ["SPY","SMH","RSP"]) if(bm[s]!=null){
       const e=(f.sleeve_return-bm[s])*100;
       tiles.push(tile("Edge vs "+s,pp(e),s+" itself: "+pct(bm[s])+" (same dollars, same days)",e>0?"good":"bad"));}}
