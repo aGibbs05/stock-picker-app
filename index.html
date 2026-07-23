@@ -585,7 +585,7 @@ function render(D){
     ${bookCost>0?(()=>{const pl=bookCostVal-bookCost,r=pl/bookCost*100;
       return `<div class="${pl>=0?"good":"bad"}" style="font-size:13px;font-weight:600;margin-top:2px">${pl>=0?"+":"−"}${usd(Math.abs(pl))} (${r>=0?"+":""}${r.toFixed(1)}%) vs what you paid${bookCostN<bookN?` <span class="muted" style="font-weight:400">(${bookCostN} of ${bookN} with an avg cost)</span>`:""}</div>`})():""}
     <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
-    ${TOK?`<a href="#" id="editsh" style="font-weight:600">✎ edit shares in app</a>`
+    ${TOK?`<a href="#" id="trbtn" style="font-weight:600">⇄ record a trade</a>`
          :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div>
     ${bookCurve(D.book)}
     ${(D.book_idx&&D.book_idx.length>=2)?`<div class="muted" style="font-size:11px;margin-top:4px">dollar curve — money you add moves it. The Home chart's book line is deposit-proof (time-weighted).</div>`:""}</div>
@@ -595,9 +595,10 @@ function render(D){
       ?`<span class="etag ${h.si.pct>=15?"amber":"slate"}" style="margin-left:7px">🩳 ${h.si.pct}% short${h.si.rising?" ↑":""}</span>`:"";
     return `<div class="card"><b class="tk">$${esc(h.ticker)}</b>${si}
     <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return `<div class="${r>=0?"good":"bad"}" style="font-size:11.5px;font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</div>`})():""}`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
-    <details><summary>edit shares</summary>
+    <details><summary>edit</summary>
     ${TOK?`<div style="display:flex;gap:8px;margin-top:8px">
-      <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1">
+      <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1;min-width:0">
+      <input class="hcin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.cost!=null?esc(h.cost):""}" placeholder="avg $ paid" style="flex:1;min-width:0">
       <button class="hsave bp" data-t="${esc(h.ticker)}">Save</button></div>
       <div class="hmsg muted" data-t="${esc(h.ticker)}" style="font-size:12.5px;margin-top:5px"></div>`
     :`<div class="muted" style="font-size:13px;margin-top:6px"><a href="#" class="gomore">Turn on in-app editing (More tab)</a> to save from here.</div>`}
@@ -783,7 +784,7 @@ function render(D){
   $("#lock").onclick=e=>{e.preventDefault();localStorage.removeItem("mc_pass");
     localStorage.removeItem("mc_cache");location.reload()};
   // in-app editing wiring (elements exist only in some states — guard each)
-  const _e=$("#editsh");if(_e)_e.onclick=ev=>{ev.preventDefault();openShares()};
+  const _e=$("#trbtn");if(_e)_e.onclick=ev=>{ev.preventDefault();openTrade()};
   const _n=$("#needtok");if(_n)_n.onclick=ev=>{ev.preventDefault();goTab("more")};
   const _g=$("#tokgo");if(_g)_g.onclick=async()=>{
     const t=$("#tokin").value.trim();
@@ -962,13 +963,138 @@ function drawShares(ed,rows){
       }else $("#shmsg").textContent=e.message}};
 }
 
+function computeTrade(rows,side,tRaw,priceRaw,dollarsRaw,sharesRaw){
+  // Pure trade math (Anthony 2026-07-23). rows=[{t,s,c}] from parseHoldings.
+  // Needs price + (dollars OR shares); the third computes. Buys use the
+  // WEIGHTED-average cost (Robinhood convention); sells leave avg unchanged;
+  // selling everything removes the line. Returns {ok, err} or
+  // {ok, rows, summary, shares, price, dollars, newTicker, avgWarn}.
+  const t=String(tRaw||"").trim().toUpperCase().replace(/^\$/,"");
+  if(!/^[A-Z.]{1,6}$/.test(t))return{ok:false,err:`"${tRaw}" isn't a ticker (1-6 letters)`};
+  const px=parseFloat(String(priceRaw).replace(/[$,]/g,""));
+  if(!(px>0))return{ok:false,err:"enter the price per share (your fill price)"};
+  let sh=parseFloat(String(sharesRaw).replace(/,/g,""));
+  let usd_=parseFloat(String(dollarsRaw).replace(/[$,]/g,""));
+  if(!(sh>0)&&!(usd_>0))return{ok:false,err:"enter dollars OR shares (either one)"};
+  if(!(sh>0))sh=usd_/px;
+  usd_=sh*px;
+  sh=Math.round(sh*1e6)/1e6;
+  const out=rows.map(r=>({...r}));
+  const i=out.findIndex(r=>r.t===t);
+  let summary="",newTicker=false,avgWarn=false;
+  if(side==="sell"){
+    if(i<0)return{ok:false,err:`you don't hold ${t}`};
+    const held=parseFloat(out[i].s||"0");
+    if(!(held>0))return{ok:false,err:`${t} has no share count on file — set it in the holding's edit box first`};
+    if(sh>held+1e-6)return{ok:false,err:`you only hold ${held} sh of ${t}`};
+    if(sh>=held-1e-6){out.splice(i,1);
+      summary=`SELL ALL ${held} sh ${t} @ ${usd(px)} = ${usd(held*px)} — position closed, card removed`;}
+    else{const left=Math.round((held-sh)*1e6)/1e6;out[i].s=String(left);
+      summary=`SELL ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — ${left} sh remain, avg unchanged${out[i].c?` (${usd(parseFloat(out[i].c))})`:""}`;}
+  }else{
+    if(i<0){out.push({t,s:String(sh),c:String(Math.round(px*1e4)/1e4)});newTicker=true;
+      summary=`BUY ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — NEW holding, avg ${usd(px)}`;}
+    else{const held=parseFloat(out[i].s||"0")||0;
+      const oldAvg=parseFloat(out[i].c||"");
+      const tot=Math.round((held+sh)*1e6)/1e6;
+      let avg;
+      if(held>0&&oldAvg>0)avg=(held*oldAvg+sh*px)/tot;
+      else{avg=px;avgWarn=held>0;}   // no prior avg on file — start from this fill
+      avg=Math.round(avg*1e4)/1e4;
+      out[i].s=String(tot);out[i].c=String(avg);
+      summary=`BUY ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — now ${tot} sh, avg ${usd(avg)}`
+        +(avgWarn?" (no prior avg was on file — avg starts from this fill; correct it in the holding's edit box if needed)":"");}
+  }
+  return{ok:true,rows:out,summary,shares:sh,price:px,dollars:Math.round(usd_*100)/100,newTicker,avgWarn,ticker:t};
+}
+
+function openTrade(){
+  const ed=$("#shed");
+  ed._trows=null;
+  ed.innerHTML=`<div class="card"><b>⇄ Record a trade</b> <span class="muted" style="font-size:12px">paper mirror of what you did in Robinhood — updates your book + ledger</span>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="tside_b" class="bp" style="flex:1">Buy</button>
+      <button id="tside_s" class="bs" style="flex:1">Sell</button></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="ttk" class="inp" placeholder="TICKER" autocapitalize="characters" style="width:86px">
+      <input id="tpx" class="inp" placeholder="price / share" inputmode="decimal" style="flex:1;min-width:0"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="tusd" class="inp" placeholder="$ total (or leave blank)" inputmode="decimal" style="flex:1;min-width:0">
+      <input id="tsh" class="inp" placeholder="shares (or leave blank)" inputmode="decimal" style="flex:1;min-width:0"></div>
+    <div id="tprev" class="muted" style="font-size:12.5px;margin-top:8px;min-height:16px"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="tgo" class="bp" style="flex:1">Preview</button>
+      <button id="tx" class="bs">Cancel</button></div></div>`;
+  let side="buy",staged=null;
+  const paint=()=>{$("#tside_b").className=side==="buy"?"bp":"bs";
+    $("#tside_s").className=side==="sell"?"bp":"bs";staged=null;
+    const g=$("#tgo");if(g)g.textContent="Preview";};
+  $("#tside_b").onclick=()=>{side="buy";paint()};
+  $("#tside_s").onclick=()=>{side="sell";paint()};
+  const _tk2=$("#ttk");if(_tk2)_tk2.oninput=()=>{staged=null;$("#tgo").textContent="Preview";
+    const h=(DATA.personal||[]).find(x=>x.ticker===_tk2.value.trim().toUpperCase().replace(/^\$/,""));
+    if(h&&h.quote&&!$("#tpx").value)$("#tpx").value=h.quote;};
+  $("#tx").onclick=()=>{ed.innerHTML=""};
+  $("#tgo").onclick=async()=>{
+    const pv=$("#tprev");
+    if(!staged){
+      try{
+        const {text,sha}=await ghGet("Investing/holdings.txt");
+        const parsed=parseHoldings(text);
+        const res=computeTrade(parsed.rows,side,$("#ttk").value,$("#tpx").value,
+                               $("#tusd").value,$("#tsh").value);
+        if(!res.ok){pv.textContent=res.err;return}
+        staged={res,head:parsed.head,sha};
+        pv.textContent=res.summary;
+        $("#tgo").textContent="Confirm ✓";
+      }catch(e){pv.textContent=e.message}
+      return;
+    }
+    pv.textContent="recording…";
+    try{
+      const {res,head,sha}=staged;
+      const body=res.rows.map(r=>r.s?(r.c?`${r.t} ${r.s} ${r.c}`:`${r.t} ${r.s}`):r.t);
+      await ghPut("Investing/holdings.txt",[...head,...body,""].join("\n"),sha,
+                  `app: ${side} ${res.ticker}`);
+      // ledger append (best-effort — the trade itself already landed)
+      try{
+        let lg=[],lsha;
+        try{const g=await ghGet("Investing/book_ledger.json");
+          lg=JSON.parse(g.text)||[];lsha=g.sha;}catch(_){}
+        lg.push({date:new Date().toISOString().slice(0,10),ticker:res.ticker,
+                 side,shares:res.shares,price:res.price,dollars:res.dollars});
+        await ghPut("Investing/book_ledger.json",JSON.stringify(lg,null,1)+"\n",
+                    lsha,`app: ledger ${side} ${res.ticker}`);
+      }catch(_){}
+      // kick the free refresh so the new state gets valued in ~2 min
+      fetch(`https://api.github.com/repos/${REPO}/actions/workflows/publish.yml/dispatches`,
+        {method:"POST",headers:ghH(),body:JSON.stringify({ref:"main"})}).catch(()=>{});
+      // reflect locally
+      const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
+      DATA.personal=res.rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
+        ticker:r.t,shares:r.s?parseFloat(r.s):null,cost:r.c?parseFloat(r.c):null}));
+      render(DATA);   // rebuilds the Book tab (form clears) — confirm below
+      const shed2=$("#shed");
+      if(shed2)shed2.innerHTML=`<div class="card"><b>recorded ✓</b> <span class="muted" style="font-size:12.5px">${esc(res.summary)}${res.newTicker?" · thesis rubric + Company-101 report follow next chat session":""} · fresh prices in ~2 min</span></div>`;
+    }catch(e){
+      if(/409|422/.test(e.message||"")){staged=null;$("#tgo").textContent="Preview";
+        pv.textContent="the book changed since the preview — tap Preview again";}
+      else pv.textContent=e.message;}
+  };
+}
+
 async function saveOneShare(t){
-  // per-holding save (Anthony 2026-07-18): edits ONLY that ticker's line in
-  // holdings.txt, preserving every other line and the header comments
+  // per-holding save (Anthony 2026-07-18; avg-$ box added 7/23): edits ONLY
+  // that ticker's line in holdings.txt, preserving every other line
   const inp=document.querySelector(`.hsin[data-t="${t}"]`);
+  const cinp=document.querySelector(`.hcin[data-t="${t}"]`);
   const msg=document.querySelector(`.hmsg[data-t="${t}"]`);
   const val=((inp&&inp.value)||"").trim();
+  const cval=((cinp&&cinp.value)||"").trim().replace(/^\$/,"");
+  if(cval&&!(parseFloat(cval)>0)){if(msg)msg.textContent=`"${cval}" isn't a price`;return}
   if(msg)msg.textContent="saving…";
+  const mkline=(keep)=>!val?t:(cval?`${t} ${val} ${cval}`
+    :(keep?`${t} ${val} ${keep}`:`${t} ${val}`));
   try{
     const {text,sha}=await ghGet("Investing/holdings.txt");
     let found=false;
@@ -976,14 +1102,15 @@ async function saveOneShare(t){
       const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
       if(p.length&&p[0].toUpperCase().replace(/^\$/,"")===t){
         found=true;
-        // keep the avg-cost token (p[2], 2026-07-21) when editing shares
-        return val?(p[2]?`${t} ${val} ${p[2]}`:`${t} ${val}`):t;}
+        // avg box wins; empty avg box keeps the existing token (p[2])
+        return mkline(p[2]);}
       return line;});
-    if(!found)out.push(val?`${t} ${val}`:t);
+    if(!found)out.push(mkline(""));
     await ghPut("Investing/holdings.txt",out.join("\n"),sha,
                 `app: ${t} share count`);
     const h=(DATA.personal||[]).find(x=>x.ticker===t);
-    if(h)h.shares=val?parseFloat(val):null;
+    if(h){h.shares=val?parseFloat(val):null;
+      if(cval)h.cost=parseFloat(cval);}
     render(DATA);
   }catch(e){if(msg)msg.textContent=e.message}
 }
