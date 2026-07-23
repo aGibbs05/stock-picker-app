@@ -176,6 +176,14 @@ tr.drill td{background:var(--tile)}
 .tform{animation:tfin .28s cubic-bezier(.25,.7,.3,1)}
 .tdone{animation:tfin .28s cubic-bezier(.25,.7,.3,1),tfade .7s ease 5.5s forwards}
 .tpulse{animation:tpulse 1.1s ease-out 2}
+/* Book holding-card v2 (2026-07-23, design lifted from Anthony's StockCard
+   component — monogram instead of external logos, motion via CSS) */
+.mono{display:inline-flex;align-items:center;justify-content:center;width:34px;
+ height:34px;border-radius:99px;color:#fff;font:700 12px var(--disp);
+ letter-spacing:.03em;flex:none}
+.daychip{font-weight:600;font-size:11.5px}
+.hcard{transition:transform .18s ease,box-shadow .18s ease}
+.hcard:hover{transform:translateY(-1px) scale(1.012)}
 .bp,.bs{transition:transform .12s ease,filter .15s ease}
 .bp:active,.bs:active{transform:scale(.96)}
 #tprev{transition:opacity .18s ease}
@@ -619,10 +627,23 @@ function render(D){
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     const si=h.si&&h.si.pct!=null
       ?`<span class="etag ${h.si.pct>=15?"amber":"slate"}" style="margin-left:7px">🩳 ${h.si.pct}% short${h.si.rising?" ↑":""}</span>`:"";
-    return `<div class="card" data-ht="${esc(h.ticker)}"><b class="tk">$${esc(h.ticker)}</b>${si}
-    <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return `<div class="${r>=0?"good":"bad"}" style="font-size:11.5px;font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</div>`})():""}`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
-    <details><summary>edit</summary>
-    ${TOK?`<div style="display:flex;gap:8px;margin-top:8px">
+    const nm=((D.writeups||{})[h.ticker]||{}).company||"";
+    const hue=[...h.ticker].reduce((a,c)=>a+c.charCodeAt(0)*7,0)%360;
+    const day=h.day_pct!=null
+      ?`<span class="daychip ${h.day_pct>=0?"good":"bad"}">${h.day_pct>=0?"↑":"↓"} ${Math.abs(h.day_pct).toFixed(1)}% today</span>`:"";
+    return `<div class="card hcard" data-ht="${esc(h.ticker)}">
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="mono" style="background:hsl(${hue} 58% 42%)">${esc(h.ticker.slice(0,2))}</span>
+      <div style="flex:1;min-width:0"><b class="tk">$${esc(h.ticker)}</b>${si}
+        ${nm?`<div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(nm)}</div>`:""}</div>
+      <span class="num" style="text-align:right;flex:none">
+        ${v!=null?`<b>${usd(v)}</b>`:(h.shares!=null?`<b>${esc(h.shares)} sh</b>`:(h.quote!=null?usd(h.quote):""))}
+        ${day?`<div>${day}</div>`:""}</span></div>
+    ${v!=null?`<div class="muted" style="font-size:11.5px;margin-top:5px">${esc(h.shares)} sh @ ${usd(h.quote)}${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return ` · <span class="${r>=0?"good":"bad"}" style="font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</span>`})():""}</div>`
+    :(h.shares!=null?`<div class="muted" style="font-size:11.5px;margin-top:5px">price arrives with the next run</div>`:"")}
+    <details><summary>edit · trade</summary>
+    ${TOK?`<button class="htr bp" data-t="${esc(h.ticker)}" style="width:100%;margin-top:8px">⇄ Trade ${esc(h.ticker)}</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
       <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1;min-width:0">
       <input class="hcin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.cost!=null?esc(h.cost):""}" placeholder="avg $ paid" style="flex:1;min-width:0">
       <button class="hsave bp" data-t="${esc(h.ticker)}">Save</button></div>
@@ -825,6 +846,7 @@ function render(D){
   const _a=$("#askgo");if(_a)_a.onclick=()=>sendAsk();
   refreshAsks();   // async: swap the payload's ask list for the live file
   document.querySelectorAll(".hsave").forEach(b=>b.onclick=()=>saveOneShare(b.dataset.t));
+  document.querySelectorAll(".htr").forEach(b=>b.onclick=()=>openTrade(b.dataset.t));
   document.querySelectorAll(".gomore").forEach(a=>a.onclick=ev=>{
     ev.preventDefault();goTab("more")});
   document.querySelectorAll(".fopen").forEach(b=>b.onclick=()=>openFileEditor(b.dataset.p));
@@ -1041,7 +1063,7 @@ function computeTrade(rows,side,tRaw,priceRaw,dollarsRaw,sharesRaw){
   return{ok:true,rows:out,summary,shares:sh,price:px,dollars:Math.round(usd_*100)/100,newTicker,avgWarn,ticker:t};
 }
 
-function openTrade(){
+function openTrade(preT){
   const ed=$("#shed");
   ed._trows=null;
   ed.innerHTML=`<div class="card tform"><b>⇄ Record a trade</b> <span class="muted" style="font-size:12px">paper mirror of what you did in Robinhood — updates your book + ledger</span>
@@ -1071,6 +1093,8 @@ function openTrade(){
   const _tk2=$("#ttk");if(_tk2)_tk2.oninput=()=>{staged=null;$("#tgo").textContent="Preview";
     const h=(DATA.personal||[]).find(x=>x.ticker===_tk2.value.trim().toUpperCase().replace(/^\$/,""));
     if(h&&h.quote&&!$("#tpx").value)$("#tpx").value=h.quote;};
+  if(preT&&_tk2){_tk2.value=preT;_tk2.oninput();   // per-card ⇄ Trade prefill
+    if(ed.scrollIntoView)try{ed.scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}}
   $("#tx").onclick=()=>{ed.innerHTML=""};
   $("#tgo").onclick=async()=>{
     const pv=$("#tprev");
