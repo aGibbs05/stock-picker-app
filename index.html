@@ -773,9 +773,14 @@ function render(D){
     <h2>Ledger (newest first)</h2><div class="card scroll">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Shares</th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div>`;
 
   // SIGNALS
-  const camps=(D.camping||[]).map(c=>`<div class="card"><b class="tk">$${esc(c.ticker)}</b>${c.cross?'<span class="badge">⚡ '+c.callers.length+' callers</span>':""}
+  const camps=(D.camping||[]).map(c=>{
+    const d=c.drift_pct;
+    const shape=d==null?"":(d>=25
+      ?`<div style="font-size:11.5px;margin-top:3px;color:var(--warn)">⚠ ${d>=0?"+":""}${d.toFixed(0)}% since first call — count grew with the run (momentum chatter, not the validated flat-price camp)</div>`
+      :`<div class="muted" style="font-size:11.5px;margin-top:3px">${d>=0?"+":""}${d.toFixed(0)}% since first call — ${d<=-15?"camping underwater":"flat-price camp shape ✓"}</div>`);
+    return `<div class="card"><b class="tk">$${esc(c.ticker)}</b>${c.cross?'<span class="badge">⚡ '+c.callers.length+' callers</span>':""}
     <span class="num" style="float:right">${c.price!=null?usd(c.price):""}</span>
-    <div class="muted" style="font-size:13px;margin-top:4px">${c.callers.map(e=>`@${esc(e.caller)} (${e.n})`).join(", ")}</div></div>`).join("");
+    <div class="muted" style="font-size:13px;margin-top:4px">${c.callers.map(e=>`@${esc(e.caller)} (${e.n})`).join(", ")}</div>${shape}</div>`}).join("");
   const track=(D.track||[]).slice().reverse().slice(0,30).map(r=>{
     const s=r.snap||{};
     const edge=s.smh_edge!=null?s.smh_edge:(s.bench_edge!=null?s.bench_edge:s.edge);
