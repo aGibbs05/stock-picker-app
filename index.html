@@ -184,6 +184,19 @@ tr.drill td{background:var(--tile)}
 .daychip{font-weight:600;font-size:11.5px}
 .hcard{transition:transform .18s ease,box-shadow .18s ease}
 .hcard:hover{transform:translateY(-1px) scale(1.012)}
+.hhead{display:flex;gap:10px;align-items:center;cursor:pointer;
+ -webkit-tap-highlight-color:transparent}
+.hchev{flex:none;color:var(--muted);font-size:12px;
+ transition:transform .3s cubic-bezier(.25,.7,.3,1)}
+.hcard.open .hchev{transform:rotate(180deg)}
+/* smooth dropdown: modern 0fr->1fr grid animation — no max-height snapping */
+.hbody{display:grid;grid-template-rows:0fr;
+ transition:grid-template-rows .32s cubic-bezier(.25,.7,.3,1)}
+.hbody>div{overflow:hidden;min-height:0}
+.hcard.open .hbody{grid-template-rows:1fr}
+/* text color classes the chips/P-L lines use (were undefined — the
+   colorless-arrow bug, 2026-07-23) */
+.good{color:var(--good)}.bad{color:var(--bad)}
 .bp,.bs{transition:transform .12s ease,filter .15s ease}
 .bp:active,.bs:active{transform:scale(.96)}
 #tprev{transition:opacity .18s ease}
@@ -631,33 +644,32 @@ function render(D){
     const hue=[...h.ticker].reduce((a,c)=>a+c.charCodeAt(0)*7,0)%360;
     const day=h.day_pct!=null
       ?`<span class="daychip ${h.day_pct>=0?"good":"bad"}">${h.day_pct>=0?"↑":"↓"} ${Math.abs(h.day_pct).toFixed(1)}% today</span>`:"";
+    const hist=(D.track||[]).filter(r=>r.ticker===h.ticker).slice(-5).reverse();
+    const camp=(D.camping||[]).find(c=>c.ticker===h.ticker);
     return `<div class="card hcard" data-ht="${esc(h.ticker)}">
-    <div style="display:flex;gap:10px;align-items:center">
+    <div class="hhead">
       <span class="mono" style="background:hsl(${hue} 58% 42%)">${esc(h.ticker.slice(0,2))}</span>
-      <div style="flex:1;min-width:0"><b class="tk">$${esc(h.ticker)}</b>${si}
+      <div style="flex:1;min-width:0"><b class="tk">$${esc(h.ticker)}</b>
         ${nm?`<div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(nm)}</div>`:""}</div>
       <span class="num" style="text-align:right;flex:none">
         ${v!=null?`<b>${usd(v)}</b>`:(h.shares!=null?`<b>${esc(h.shares)} sh</b>`:(h.quote!=null?usd(h.quote):""))}
-        ${day?`<div>${day}</div>`:""}</span></div>
-    ${v!=null?`<div class="muted" style="font-size:11.5px;margin-top:5px">${esc(h.shares)} sh @ ${usd(h.quote)}${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return ` · <span class="${r>=0?"good":"bad"}" style="font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</span>`})():""}</div>`
-    :(h.shares!=null?`<div class="muted" style="font-size:11.5px;margin-top:5px">price arrives with the next run</div>`:"")}
-    <details><summary>edit · trade</summary>
-    ${TOK?`<button class="htr bp" data-t="${esc(h.ticker)}" style="width:100%;margin-top:8px">⇄ Trade ${esc(h.ticker)}</button>
+        ${day?`<div>${day}</div>`:""}</span>
+      <span class="hchev">▾</span></div>
+    <div class="hbody"><div>
+      ${v!=null?`<div class="muted" style="font-size:12px;margin-top:8px">${esc(h.shares)} sh @ ${usd(h.quote)}${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return ` · <span class="${r>=0?"good":"bad"}" style="font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</span>`})():""}${si}</div>`
+      :(h.shares!=null?`<div class="muted" style="font-size:12px;margin-top:8px">price arrives with the next run${si}</div>`:(si?`<div style="margin-top:8px">${si}</div>`:""))}
+      ${TOK?`<button class="htr bp" data-t="${esc(h.ticker)}" style="width:100%;margin-top:10px">⇄ Trade ${esc(h.ticker)}</button>
       <div style="display:flex;gap:8px;margin-top:8px">
       <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1;min-width:0">
       <input class="hcin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.cost!=null?esc(h.cost):""}" placeholder="avg $ paid" style="flex:1;min-width:0">
       <button class="hsave bp" data-t="${esc(h.ticker)}">Save</button></div>
       <div class="hmsg muted" data-t="${esc(h.ticker)}" style="font-size:12.5px;margin-top:5px"></div>`
-    :`<div class="muted" style="font-size:13px;margin-top:6px"><a href="#" class="gomore">Turn on in-app editing (More tab)</a> to save from here.</div>`}
-    </details>${(()=>{   // drill-down: this name's audited history + camp status
-      const hist=(D.track||[]).filter(r=>r.ticker===h.ticker).slice(-5).reverse();
-      const camp=(D.camping||[]).find(c=>c.ticker===h.ticker);
-      if(!hist.length&&!camp)return "";
-      return `<details><summary>pick history${hist.length?` (${hist.length})`:""}${camp?" · camping":""}</summary>
-        ${camp?`<div style="font-size:13px;color:var(--warn);margin-top:6px">⛺ ${camp.callers.map(e2=>`@${esc(e2.caller)} (${e2.n})`).join(", ")} camping</div>`:""}
-        ${hist.map(r=>{const s=r.snap||{};const eg=s.smh_edge??s.bench_edge??s.edge;
-          return `<div style="font-size:13px;color:var(--ink2);margin-top:6px">${mdy(r.date)} · T${esc(r.tier??"—")}${r.winner?" · pick of the day":""}${s.ret!=null?` · ${pp(s.ret).replace("pp","%")} (${r.snap_days}d)`:""}${eg!=null?` · edge ${pp(eg)}`:""}${r.rv?`<div class="muted" style="font-size:12px">${esc(r.rv)}</div>`:""}</div>`}).join("")}
-      </details>`})()}</div>`}).join("");
+      :`<div class="muted" style="font-size:13px;margin-top:8px"><a href="#" class="gomore">Turn on in-app editing (More tab)</a> to trade or edit from here.</div>`}
+      ${camp?`<div style="font-size:12.5px;color:var(--warn);margin-top:10px">⛺ ${camp.callers.map(e2=>`@${esc(e2.caller)} (${e2.n})`).join(", ")} camping</div>`:""}
+      ${hist.length?`<div class="muted" style="font:600 11px var(--disp);letter-spacing:.04em;text-transform:uppercase;margin-top:10px">Pick history</div>`
+        +hist.map(r=>{const s=r.snap||{};const eg=s.smh_edge??s.bench_edge??s.edge;
+          return `<div style="font-size:12.5px;color:var(--ink2);margin-top:5px">${mdy(r.date)} · T${esc(r.tier??"—")}${r.winner?" · pick of the day":""}${s.ret!=null?` · ${pp(s.ret).replace("pp","%")} (${r.snap_days}d)`:""}${eg!=null?` · edge ${pp(eg)}`:""}${r.rv?`<div class="muted" style="font-size:11.5px">${esc(r.rv)}</div>`:""}</div>`}).join(""):""}
+    </div></div></div>`}).join("");
   $("#t-book").innerHTML=`${bookHead}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}`;
 
   // RADAR — calendar-style event cards (visual rework, Anthony 2026-07-18)
@@ -847,6 +859,8 @@ function render(D){
   refreshAsks();   // async: swap the payload's ask list for the live file
   document.querySelectorAll(".hsave").forEach(b=>b.onclick=()=>saveOneShare(b.dataset.t));
   document.querySelectorAll(".htr").forEach(b=>b.onclick=()=>openTrade(b.dataset.t));
+  document.querySelectorAll(".hhead").forEach(hd=>hd.onclick=()=>{
+    const c=hd.parentNode;if(c&&c.classList)c.classList.toggle("open");});
   document.querySelectorAll(".gomore").forEach(a=>a.onclick=ev=>{
     ev.preventDefault();goTab("more")});
   document.querySelectorAll(".fopen").forEach(b=>b.onclick=()=>openFileEditor(b.dataset.p));
