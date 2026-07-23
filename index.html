@@ -168,6 +168,17 @@ tr.drill td{background:var(--tile)}
  font-size:10px}
 .emono{margin:8px 0 0;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;
  white-space:pre;color:var(--ink2)}
+/* trade-flow feel (2026-07-23): entrances, success fade, holding pulse */
+@keyframes tfin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes tfade{to{opacity:0}}
+@keyframes tpulse{0%{box-shadow:0 0 0 0 rgba(59,130,246,.45)}
+ 100%{box-shadow:0 0 0 16px rgba(59,130,246,0)}}
+.tform{animation:tfin .28s cubic-bezier(.25,.7,.3,1)}
+.tdone{animation:tfin .28s cubic-bezier(.25,.7,.3,1),tfade .7s ease 5.5s forwards}
+.tpulse{animation:tpulse 1.1s ease-out 2}
+.bp,.bs{transition:transform .12s ease,filter .15s ease}
+.bp:active,.bs:active{transform:scale(.96)}
+#tprev{transition:opacity .18s ease}
 /* Radar event cards */
 .ecard{position:relative;overflow:hidden;display:flex;gap:12px;align-items:flex-start;
  background:var(--card);border-radius:14px;box-shadow:var(--shadow);
@@ -515,7 +526,22 @@ function emailCards(e){
     ${fmtBody(s.lines)}</div>`).join("");
 }
 
+function _saveBookOv(){
+  // pin the locally-edited book so a stale-payload refresh can't resurrect a
+  // sold position (the DPRO ghost, 2026-07-23) — 10 min outlives the publish
+  try{localStorage.setItem("mc_book_ov",
+    JSON.stringify({at:Date.now(),rows:DATA.personal||[]}))}catch(e){}
+}
 function render(D){
+  try{
+    const ov=JSON.parse(localStorage.getItem("mc_book_ov")||"null");
+    if(ov&&ov.rows&&Date.now()-ov.at<600000){
+      // a payload PUBLISHED AFTER the local edit is fresher truth — retire
+      const gen=Date.parse(String(D.generated||"").replace(" ","T")+":00Z");
+      if(gen>ov.at)localStorage.removeItem("mc_book_ov");
+      else D.personal=ov.rows;
+    }else if(ov)localStorage.removeItem("mc_book_ov");
+  }catch(e){}
   $("#stamp").textContent="as of "+D.generated+" · updates with each run";
   const f=D.fund||{}, bm=f.bench_matched||{};
   setRing(f);
@@ -593,7 +619,7 @@ function render(D){
   const hold=ph.map(h=>{const v=(h.shares!=null&&h.quote!=null)?h.shares*h.quote:null;
     const si=h.si&&h.si.pct!=null
       ?`<span class="etag ${h.si.pct>=15?"amber":"slate"}" style="margin-left:7px">🩳 ${h.si.pct}% short${h.si.rising?" ↑":""}</span>`:"";
-    return `<div class="card"><b class="tk">$${esc(h.ticker)}</b>${si}
+    return `<div class="card" data-ht="${esc(h.ticker)}"><b class="tk">$${esc(h.ticker)}</b>${si}
     <span class="num" style="float:right;text-align:right">${v!=null?`<b>${usd(v)}</b><div class="muted" style="font-size:11.5px">${esc(h.shares)} sh @ ${usd(h.quote)}</div>${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return `<div class="${r>=0?"good":"bad"}" style="font-size:11.5px;font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</div>`})():""}`:(h.shares!=null?`<b>${esc(h.shares)} sh</b><div class="muted" style="font-size:11.5px">price arrives with the next run</div>`:(h.quote!=null?usd(h.quote):""))}</span>
     <details><summary>edit</summary>
     ${TOK?`<div style="display:flex;gap:8px;margin-top:8px">
@@ -1018,7 +1044,7 @@ function computeTrade(rows,side,tRaw,priceRaw,dollarsRaw,sharesRaw){
 function openTrade(){
   const ed=$("#shed");
   ed._trows=null;
-  ed.innerHTML=`<div class="card"><b>⇄ Record a trade</b> <span class="muted" style="font-size:12px">paper mirror of what you did in Robinhood — updates your book + ledger</span>
+  ed.innerHTML=`<div class="card tform"><b>⇄ Record a trade</b> <span class="muted" style="font-size:12px">paper mirror of what you did in Robinhood — updates your book + ledger</span>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="tside_b" class="bp" style="flex:1">Buy</button>
       <button id="tside_s" class="bs" style="flex:1">Sell</button>
@@ -1080,13 +1106,21 @@ function openTrade(){
       // kick the free refresh so the new state gets valued in ~2 min
       fetch(`https://api.github.com/repos/${REPO}/actions/workflows/publish.yml/dispatches`,
         {method:"POST",headers:ghH(),body:JSON.stringify({ref:"main"})}).catch(()=>{});
-      // reflect locally
+      // reflect locally + pin against stale-payload refreshes (DPRO ghost)
       const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
       DATA.personal=res.rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
         ticker:r.t,shares:r.s?parseFloat(r.s):null,cost:r.c?parseFloat(r.c):null}));
+      _saveBookOv();
+      const sy=window.scrollY||0;
       render(DATA);   // rebuilds the Book tab (form clears) — confirm below
+      if(window.scrollTo)window.scrollTo(0,sy);   // no jump — stay where he was
       const shed2=$("#shed");
-      if(shed2)shed2.innerHTML=`<div class="card"><b>recorded ✓</b> <span class="muted" style="font-size:12.5px">${esc(res.summary)}${res.newTicker?" · thesis rubric + Company-101 report follow next chat session":""} · fresh prices in ~2 min</span></div>`;
+      if(shed2)shed2.innerHTML=`<div class="card tdone"><b style="color:var(--good,#16a34a)">✓ recorded</b> <span class="muted" style="font-size:12.5px">${esc(res.summary)}${res.newTicker?" · thesis rubric + Company-101 report follow next chat session":""} · fresh prices in ~2 min</span></div>`;
+      // pulse the affected holding card so the eye lands on the change
+      if(!/closed/.test(res.summary)&&window.requestAnimationFrame)
+        requestAnimationFrame(()=>{const c=document.querySelector(`[data-ht="${res.ticker}"]`);
+          if(c&&c.classList){c.classList.add("tpulse");
+            setTimeout(()=>c.classList.remove("tpulse"),2400);}});
     }catch(e){
       if(/409|422/.test(e.message||"")){staged=null;$("#tgo").textContent="Preview";
         pv.textContent="the book changed since the preview — tap Preview again";}
@@ -1122,7 +1156,10 @@ async function saveOneShare(t){
     const h=(DATA.personal||[]).find(x=>x.ticker===t);
     if(h){h.shares=val?parseFloat(val):null;
       if(cval)h.cost=parseFloat(cval);}
+    _saveBookOv();
+    const sy1=window.scrollY||0;
     render(DATA);
+    if(window.scrollTo)window.scrollTo(0,sy1);
   }catch(e){if(msg)msg.textContent=e.message}
 }
 
