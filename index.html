@@ -741,7 +741,11 @@ function render(D){
       ${wSec("5 · Financial health",w.financial)}
       ${wSec("6 · Biggest risk",w.risk)}
       ${wSec("7 · Bull vs bear case",[...(w.bull||[]).map(x=>"Bull — "+x),...(w.bear||[]).map(x=>"Bear — "+x)])}
-      ${wSec("8 · Final takeaway",w.takeaway)}
+      ${(w.comps&&w.comps.length)?`<div style="margin-top:10px"><b class="elbl">8 · Similar &amp; competing companies</b>${w.comps.map(x=>{
+        const m=String(x).match(/^\$?([A-Z][A-Z.]{0,5})\b/);
+        const link=m&&wu[m[1]];
+        return `<p class="ep ebul">${link?`<a href="#" class="wcomp" data-t="${esc(m[1])}" style="text-decoration:none"><b class="tk">$${esc(m[1])}</b></a>${fmtInline(String(x).slice(m[0].length))}`:fmtInline(String(x))}</p>`}).join("")}</div>`:""}
+      ${wSec("9 · Final takeaway",w.takeaway)}
     </details></div>`}).join("");
   const wChips=wq.filter(t=>!wu[t]).map(t=>
     `<span class="etag amber" style="margin:0 6px 6px 0;display:inline-block">$${esc(t)} — queued, arrives next chat session</span>`).join("");
@@ -757,6 +761,9 @@ function render(D){
     <div id="wnone" class="card" style="display:none"><p class="muted"></p></div>`;
   const _ws=$("#wsearch");if(_ws)_ws.oninput=()=>filterReports(_ws.value);
   const _wq=$("#wqgo");if(_wq)_wq.onclick=()=>queueWriteup();
+  // tap a comparable's ticker inside a report → filter the library to it
+  document.querySelectorAll(".wcomp").forEach(a=>a.onclick=ev=>{ev.preventDefault();
+    const ws2=$("#wsearch");if(ws2){ws2.value=a.dataset.t;filterReports(a.dataset.t);}});
 
   // FUND
   const frows=rows.map(r=>`<tr><td>${tk(r.ticker)}</td>
