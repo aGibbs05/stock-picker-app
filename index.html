@@ -785,21 +785,8 @@ function render(D){
     <div id="wnone" class="card" style="display:none"><p class="muted"></p></div>`;
   const _ws=$("#wsearch");if(_ws)_ws.oninput=()=>filterReports(_ws.value);
   const _wq=$("#wqgo");if(_wq)_wq.onclick=()=>queueWriteup();
-  // tap a comparable's ticker inside a report → filter the library to it
-  document.querySelectorAll(".wcomp").forEach(a=>a.onclick=ev=>{ev.preventDefault();
-    const ws2=$("#wsearch");if(ws2){ws2.value=a.dataset.t;filterReports(a.dataset.t);}});
-  // accordion for REPORTS (one open at a time); plain toggle for the Home
-  // fund sections (.fx) and any other whead expandable
-  document.querySelectorAll(".whead").forEach(hd=>hd.onclick=()=>{
-    const c=hd.parentNode;if(!c||!c.classList)return;
-    const was=c.classList.contains("open");
-    if(c.classList.contains("wcard"))
-      document.querySelectorAll(".wcard.open").forEach(o=>{if(o!==c)o.classList.remove("open")});
-    c.classList[was?"remove":"add"]("open");});
-  // nested "The numbers" dropdown inside a report
-  document.querySelectorAll(".ntog").forEach(tg=>tg.onclick=ev=>{
-    if(ev.stopPropagation)ev.stopPropagation();
-    const p2=tg.parentNode;if(p2&&p2.classList)p2.classList.toggle("nopen");});
+  // (wcomp / whead / ntog handlers bind in the LATE wiring block — the Home
+  //  fund sections don't exist yet at this point in render; 2026-07-24 bug)
 
   // FUND — consolidated into Home (Anthony 2026-07-24): positions + ledger
   // become collapsed expandable sections below the tiles; the Fund tab is gone
@@ -920,6 +907,21 @@ function render(D){
   document.querySelectorAll(".htr").forEach(b=>b.onclick=()=>openTrade(b.dataset.t));
   document.querySelectorAll(".hhead").forEach(hd=>hd.onclick=()=>{
     const c=hd.parentNode;if(c&&c.classList)c.classList.toggle("open");});
+  // tap a comparable's ticker inside a report → filter the library to it
+  document.querySelectorAll(".wcomp").forEach(a=>a.onclick=ev=>{ev.preventDefault();
+    const ws2=$("#wsearch");if(ws2){ws2.value=a.dataset.t;filterReports(a.dataset.t);}});
+  // accordion for REPORTS (one open at a time); plain toggle for the Home
+  // fund sections (.fx) — bound HERE so late-appended nodes are covered
+  document.querySelectorAll(".whead").forEach(hd=>hd.onclick=()=>{
+    const c=hd.parentNode;if(!c||!c.classList)return;
+    const was=c.classList.contains("open");
+    if(c.classList.contains("wcard"))
+      document.querySelectorAll(".wcard.open").forEach(o=>{if(o!==c)o.classList.remove("open")});
+    c.classList[was?"remove":"add"]("open");});
+  // nested "The numbers" dropdown inside a report
+  document.querySelectorAll(".ntog").forEach(tg=>tg.onclick=ev=>{
+    if(ev.stopPropagation)ev.stopPropagation();
+    const p2=tg.parentNode;if(p2&&p2.classList)p2.classList.toggle("nopen");});
   document.querySelectorAll(".gomore").forEach(a=>a.onclick=ev=>{
     ev.preventDefault();goTab("more")});
   document.querySelectorAll(".fopen").forEach(b=>b.onclick=()=>openFileEditor(b.dataset.p));
