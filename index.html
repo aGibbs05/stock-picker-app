@@ -136,9 +136,9 @@ html[data-theme=dark] #moonic{display:block}
 /* sliding tab track: all tabs pre-rendered side by side; the track translates,
    so swipes are a real finger-following animation, not a display toggle */
 #tview{overflow:hidden;margin:0 -14px}
-#track{display:flex;width:800%;align-items:flex-start;
+#track{display:flex;width:700%;align-items:flex-start;
  transition:transform .32s cubic-bezier(.25,.7,.3,1)}
-.tab{width:12.5%;flex:none;padding:0 14px}
+.tab{width:14.2857%;flex:none;padding:0 14px}
 .tab.off{height:0;overflow:hidden}
 .chart{position:relative}
 .xline{position:absolute;top:0;bottom:40px;width:1.5px;background:var(--blue);
@@ -193,7 +193,8 @@ tr.drill td{background:var(--tile)}
 .hbody{display:grid;grid-template-rows:0fr;
  transition:grid-template-rows .32s cubic-bezier(.25,.7,.3,1)}
 .hbody>div{overflow:hidden;min-height:0}
-.hcard.open .hbody,.wcard.open .hbody{grid-template-rows:1fr}
+.hcard.open .hbody,.wcard.open .hbody,.fx.open .hbody{grid-template-rows:1fr}
+.fx.open .hchev{transform:rotate(180deg)}
 /* Reports accordion (one open at a time) + nested numbers dropdown */
 .whead{display:flex;gap:6px;align-items:center;cursor:pointer;
  -webkit-tap-highlight-color:transparent}
@@ -282,7 +283,6 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       <button data-t="today" class="on">Today</button>
       <button data-t="home">Home</button>
       <button data-t="book">Book</button>
-      <button data-t="fund">Fund</button>
       <button data-t="sig">Record</button>
       <button data-t="radar">Radar</button>
       <button data-t="reports">Reports</button>
@@ -293,7 +293,6 @@ footer{color:var(--muted);font-size:11.5px;text-align:center;padding:20px 10px 8
       <div id="t-today" class="tab"></div>
       <div id="t-home" class="tab"></div>
       <div id="t-book" class="tab"></div>
-      <div id="t-fund" class="tab"></div>
       <div id="t-sig"  class="tab"></div>
       <div id="t-radar" class="tab"></div>
       <div id="t-reports" class="tab"></div>
@@ -752,7 +751,7 @@ function render(D){
       ${nRow("EPS (12mo)",n.eps!=null?"$"+(+n.eps).toFixed(2):"—",`<span style="font-size:11px">not comparable</span>`)}
       ${nRow("Debt / equity",n.de!=null?(+n.de/100).toFixed(2):"—",c2.de!=null?(+c2.de/100).toFixed(2):"—")}
       ${nRow("FCF margin",fPct2(n.fcf_m),fPct2(c2.fcf_m))}
-      </table><div class="muted" style="font-size:10.5px;margin-top:4px">vs the median of ${n.comp_n||0} direct competitor${(n.comp_n||0)===1?"":"s"} from §9 · FCF margin = the share of revenue that becomes free cash · refreshed each publish</div></div></div></div>`:"";
+      </table><div class="muted" style="font-size:10.5px;margin-top:4px">vs the median of ${n.comp_n||0} comparable compan${(n.comp_n||0)===1?"y":"ies"} (direct competitors + close industry peers) · FCF margin = the share of revenue that becomes free cash · refreshed each publish</div></div></div></div>`:"";
     return `<div class="card wcard" data-search="${esc((t+" "+(w.company||"")).toLowerCase())}">
     <div class="whead"><b class="tk">$${esc(t)}</b>
       <span style="font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"> ${esc(w.company||"")}</span>
@@ -789,18 +788,21 @@ function render(D){
   // tap a comparable's ticker inside a report → filter the library to it
   document.querySelectorAll(".wcomp").forEach(a=>a.onclick=ev=>{ev.preventDefault();
     const ws2=$("#wsearch");if(ws2){ws2.value=a.dataset.t;filterReports(a.dataset.t);}});
-  // accordion: ONE report open at a time (Anthony 2026-07-23), smooth close+open
+  // accordion for REPORTS (one open at a time); plain toggle for the Home
+  // fund sections (.fx) and any other whead expandable
   document.querySelectorAll(".whead").forEach(hd=>hd.onclick=()=>{
     const c=hd.parentNode;if(!c||!c.classList)return;
     const was=c.classList.contains("open");
-    document.querySelectorAll(".wcard.open").forEach(o=>{if(o!==c)o.classList.remove("open")});
+    if(c.classList.contains("wcard"))
+      document.querySelectorAll(".wcard.open").forEach(o=>{if(o!==c)o.classList.remove("open")});
     c.classList[was?"remove":"add"]("open");});
   // nested "The numbers" dropdown inside a report
   document.querySelectorAll(".ntog").forEach(tg=>tg.onclick=ev=>{
     if(ev.stopPropagation)ev.stopPropagation();
     const p2=tg.parentNode;if(p2&&p2.classList)p2.classList.toggle("nopen");});
 
-  // FUND
+  // FUND — consolidated into Home (Anthony 2026-07-24): positions + ledger
+  // become collapsed expandable sections below the tiles; the Fund tab is gone
   const frows=rows.map(r=>`<tr><td>${tk(r.ticker)}</td>
     <td class="num">${shfmt(r.shares)}</td><td class="num">${usd(r.value)}</td>
     <td class="num">${pill(r.gain_pct)}</td></tr>`).join("");
@@ -808,11 +810,15 @@ function render(D){
     <td>${esc(l.kind)}</td><td>${tk(l.ticker)}</td>
     <td class="num">${shfmt(l.shares)}</td><td class="num">${usd(l.cost)}</td>
     <td class="num">${l.price!=null?usd(l.price):"—"}</td></tr>`).join("");
-  $("#t-fund").innerHTML=`<div class="tiles">${
-    tile("Equity",usd(f.equity),"return "+pct(f.total_return)+" on "+usd(f.net_contributions))}${
-    tile("War-chest",usd(f.cash),"deploy through 2026-12-31")}</div>
-    <h2>Positions</h2><div class="card scroll">${frows?`<table><thead><tr><th>Ticker</th><th class="num">Shares</th><th class="num">Value</th><th class="num">Gain</th></tr></thead>${frows}</table>`:'<p class="muted">—</p>'}</div>
-    <h2>Ledger (newest first)</h2><div class="card scroll">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Shares</th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div>`;
+  const fundHome=`
+    <div class="card fx"><div class="whead"><b>Fund positions</b>
+      <span class="muted" style="margin-left:auto;font-size:11.5px;flex:none">${f.n_positions??"—"} · war-chest ${usd(f.cash)}</span><span class="hchev">▾</span></div>
+      <div class="hbody"><div><div class="scroll" style="margin-top:8px">${frows?`<table><thead><tr><th>Ticker</th><th class="num">Shares</th><th class="num">Value</th><th class="num">Gain</th></tr></thead>${frows}</table>`:'<p class="muted">—</p>'}</div>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">return ${pct(f.total_return)} on ${usd(f.net_contributions)} · war-chest deploys through 2026-12-31</div></div></div></div>
+    <div class="card fx"><div class="whead"><b>Fund ledger</b>
+      <span class="muted" style="margin-left:auto;font-size:11.5px;flex:none">${(f.lots||[]).length} entries</span><span class="hchev">▾</span></div>
+      <div class="hbody"><div><div class="scroll" style="margin-top:8px">${lots?`<table><thead><tr><th>Date</th><th>Kind</th><th></th><th class="num">Shares</th><th class="num">Cost</th><th class="num">@Price</th></tr></thead>${lots}</table>`:'<p class="muted">—</p>'}</div></div></div></div>`;
+  const _th=$("#t-home");if(_th)_th.innerHTML+=fundHome;
 
   // SIGNALS
   const camps=(D.camping||[]).map(c=>{
@@ -1358,7 +1364,7 @@ async function queueWriteup(){
 // tabs translates the track, so the neighbor physically slides into frame.
 // Inactive tabs collapse (height:0) AFTER the slide settles so the page's
 // scroll height belongs to the visible tab only.
-const ORDER=["today","home","book","fund","sig","radar","reports","more"];
+const ORDER=["today","home","book","sig","radar","reports","more"];
 let CUR="today",_collapseT=null;
 function _setTrack(idx,extraPx){
   const tr=$("#track");
