@@ -621,7 +621,13 @@ function render(D){
   // BOOK (personal) — share counts come from holdings.txt ("AVGO 0.7");
   // names without a count still list, they just can't be valued.
   const gh0="https://github.com/aGibbs05/stock-picker";
-  const ph=D.personal||[];
+  // biggest position first (Anthony 2026-07-23) — re-ranks itself every
+  // refresh as prices move; unvalued names sink to the bottom alphabetically
+  const ph=[...(D.personal||[])].sort((a,b)=>{
+    const va=(a.shares!=null&&a.quote!=null)?a.shares*a.quote:-1;
+    const vb=(b.shares!=null&&b.quote!=null)?b.shares*b.quote:-1;
+    return (vb-va)||String(a.ticker).localeCompare(String(b.ticker));
+  });
   let bookTot=0,bookN=0,noQuote=0,bookCost=0,bookCostVal=0,bookCostN=0;
   for(const h of ph){
     if(h.shares!=null&&h.quote!=null){bookTot+=h.shares*h.quote;bookN++;
