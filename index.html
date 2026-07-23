@@ -193,7 +193,17 @@ tr.drill td{background:var(--tile)}
 .hbody{display:grid;grid-template-rows:0fr;
  transition:grid-template-rows .32s cubic-bezier(.25,.7,.3,1)}
 .hbody>div{overflow:hidden;min-height:0}
-.hcard.open .hbody{grid-template-rows:1fr}
+.hcard.open .hbody,.wcard.open .hbody{grid-template-rows:1fr}
+/* Reports accordion (one open at a time) + nested numbers dropdown */
+.whead{display:flex;gap:6px;align-items:center;cursor:pointer;
+ -webkit-tap-highlight-color:transparent}
+.wcard.open .hchev{transform:rotate(180deg)}
+.ntog::after{content:" ▸";color:var(--muted)}
+.nopen>.ntog::after{content:" ▾"}
+.nwrap{display:grid;grid-template-rows:0fr;
+ transition:grid-template-rows .3s cubic-bezier(.25,.7,.3,1)}
+.nwrap>div{overflow:hidden;min-height:0}
+.nopen .nwrap{grid-template-rows:1fr}
 /* text color classes the chips/P-L lines use (were undefined — the
    colorless-arrow bug, 2026-07-23) */
 .good{color:var(--good)}.bad{color:var(--bad)}
@@ -729,24 +739,39 @@ function render(D){
       ?v.map(x=>`<p class="ep ebul">${fmtInline(String(x))}</p>`).join("")
       :`<p class="ep">${fmtInline(String(v))}</p>`;
     return `<div style="margin-top:10px"><b class="elbl">${lbl}</b>${body}</div>`;};
+  const fPe=x=>x==null?"—":(x<=0?"loss":(+x).toFixed(0));
+  const fPct2=x=>x==null?"—":((x>=0?"+":"")+(x*100).toFixed(0)+"%");
+  const nRow=(l,a,b)=>`<tr><td class="muted" style="font-size:12px;padding:3px 0">${l}</td><td class="num" style="font-weight:600">${a}</td><td class="num muted">${b}</td></tr>`;
   const wCards=wuKeys.map(t=>{const w=wu[t];
+    const n=w.numbers,c2=(n&&n.comp)||{};
+    const numbers=n?`<div style="margin-top:10px"><b class="elbl ntog" style="cursor:pointer">6 · The numbers</b>
+      <div class="nwrap"><div><table style="width:100%;margin-top:6px"><thead><tr><th></th><th class="num" style="font-size:11px">${esc(t)}</th><th class="num muted" style="font-size:11px">comps median</th></tr></thead>
+      ${nRow("P/E trailing",fPe(n.pe_t),fPe(c2.pe_t))}
+      ${nRow("P/E forward",fPe(n.pe_f),fPe(c2.pe_f))}
+      ${nRow("Rev growth (yr)",n.rev_g1!=null?fPct2(n.rev_g1)+(n.rev_g2!=null?` <span class="muted" style="font-size:11px">(prior yr ${fPct2(n.rev_g2)})</span>`:""):"—",fPct2(c2.rev_g1))}
+      ${nRow("EPS (12mo)",n.eps!=null?"$"+(+n.eps).toFixed(2):"—",`<span style="font-size:11px">not comparable</span>`)}
+      ${nRow("Debt / equity",n.de!=null?(+n.de/100).toFixed(2):"—",c2.de!=null?(+c2.de/100).toFixed(2):"—")}
+      ${nRow("FCF margin",fPct2(n.fcf_m),fPct2(c2.fcf_m))}
+      </table><div class="muted" style="font-size:10.5px;margin-top:4px">vs the median of ${n.comp_n||0} direct competitor${(n.comp_n||0)===1?"":"s"} from §9 · FCF margin = the share of revenue that becomes free cash · refreshed each publish</div></div></div></div>`:"";
     return `<div class="card wcard" data-search="${esc((t+" "+(w.company||"")).toLowerCase())}">
-    <details><summary style="list-style:none;cursor:pointer"><b class="tk">$${esc(t)}</b>
-      <span style="font-weight:600"> ${esc(w.company||"")}</span>
-      <span class="muted" style="float:right;font-size:11.5px">${esc(w.updated||"")}</span></summary>
+    <div class="whead"><b class="tk">$${esc(t)}</b>
+      <span style="font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"> ${esc(w.company||"")}</span>
+      <span class="muted" style="font-size:11.5px;flex:none">${esc(w.updated||"")}</span><span class="hchev">▾</span></div>
+    <div class="hbody"><div>
       ${wSec("1 · What this company does",w.what)}
       ${wSec("2 · Why people use it",w.why)}
       ${wSec("3 · How it makes money",w.money)}
       ${wSec("4 · Is the business strong?",w.strong)}
       ${wSec("5 · Financial health",w.financial)}
-      ${wSec("6 · Biggest risk",w.risk)}
-      ${wSec("7 · Bull vs bear case",[...(w.bull||[]).map(x=>"Bull — "+x),...(w.bear||[]).map(x=>"Bear — "+x)])}
-      ${(w.comps&&w.comps.length)?`<div style="margin-top:10px"><b class="elbl">8 · Similar &amp; competing companies</b>${w.comps.map(x=>{
+      ${numbers}
+      ${wSec("7 · Biggest risk",w.risk)}
+      ${wSec("8 · Bull vs bear case",[...(w.bull||[]).map(x=>"Bull — "+x),...(w.bear||[]).map(x=>"Bear — "+x)])}
+      ${(w.comps&&w.comps.length)?`<div style="margin-top:10px"><b class="elbl">9 · Similar &amp; competing companies</b>${w.comps.map(x=>{
         const m=String(x).match(/^\$?([A-Z][A-Z.]{0,5})\b/);
         const link=m&&wu[m[1]];
         return `<p class="ep ebul">${link?`<a href="#" class="wcomp" data-t="${esc(m[1])}" style="text-decoration:none"><b class="tk">$${esc(m[1])}</b></a>${fmtInline(String(x).slice(m[0].length))}`:fmtInline(String(x))}</p>`}).join("")}</div>`:""}
-      ${wSec("9 · Final takeaway",w.takeaway)}
-    </details></div>`}).join("");
+      ${wSec("10 · Final takeaway",w.takeaway)}
+    </div></div></div>`}).join("");
   const wChips=wq.filter(t=>!wu[t]).map(t=>
     `<span class="etag amber" style="margin:0 6px 6px 0;display:inline-block">$${esc(t)} — queued, arrives next chat session</span>`).join("");
   $("#t-reports").innerHTML=`<h2 style="margin-top:6px">Reports <span class="muted" style="font-weight:400">(simple company 101s — written free in chat, not by the paid run)</span></h2>
@@ -764,6 +789,16 @@ function render(D){
   // tap a comparable's ticker inside a report → filter the library to it
   document.querySelectorAll(".wcomp").forEach(a=>a.onclick=ev=>{ev.preventDefault();
     const ws2=$("#wsearch");if(ws2){ws2.value=a.dataset.t;filterReports(a.dataset.t);}});
+  // accordion: ONE report open at a time (Anthony 2026-07-23), smooth close+open
+  document.querySelectorAll(".whead").forEach(hd=>hd.onclick=()=>{
+    const c=hd.parentNode;if(!c||!c.classList)return;
+    const was=c.classList.contains("open");
+    document.querySelectorAll(".wcard.open").forEach(o=>{if(o!==c)o.classList.remove("open")});
+    c.classList[was?"remove":"add"]("open");});
+  // nested "The numbers" dropdown inside a report
+  document.querySelectorAll(".ntog").forEach(tg=>tg.onclick=ev=>{
+    if(ev.stopPropagation)ev.stopPropagation();
+    const p2=tg.parentNode;if(p2&&p2.classList)p2.classList.toggle("nopen");});
 
   // FUND
   const frows=rows.map(r=>`<tr><td>${tk(r.ticker)}</td>
