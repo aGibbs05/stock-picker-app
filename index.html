@@ -677,6 +677,8 @@ function render(D){
     <div class="hbody"><div>
       ${v!=null?`<div class="muted" style="font-size:12px;margin-top:8px">${esc(h.shares)} sh @ ${usd(h.quote)}${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return ` · <span class="${r>=0?"good":"bad"}" style="font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</span>`})():""}${si}</div>`
       :(h.shares!=null?`<div class="muted" style="font-size:12px;margin-top:8px">price arrives with the next run${si}</div>`:(si?`<div style="margin-top:8px">${si}</div>`:""))}
+      ${h.pt>0&&h.quote>0?(()=>{const u=(h.pt/h.quote-1)*100;
+        return `<div class="muted" style="font-size:12px;margin-top:5px">🎯 analysts avg ${usd(h.pt)} <span class="${u>=0?"good":"bad"}" style="font-weight:600">(${u>=0?"+":""}${u.toFixed(0)}% vs now)</span>${h.reco?` · rated ${esc(String(h.reco).replace(/_/g," "))}`:""}</div>`})():""}
       ${TOK?`<button class="htr bp" data-t="${esc(h.ticker)}" style="width:100%;margin-top:10px">⇄ Trade ${esc(h.ticker)}</button>
       <div style="display:flex;gap:8px;margin-top:8px">
       <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1;min-width:0">
