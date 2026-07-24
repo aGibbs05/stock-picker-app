@@ -857,6 +857,15 @@ function render(D){
       <input id="tokin" class="inp" type="password" placeholder="ghp_… or github_pat_…" style="width:100%;margin-top:8px">
       <button id="tokgo" class="bp" style="width:100%;margin-top:8px">Save key on this phone</button>
       <div id="tokmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`;
+  const agItems=(D.agenda||[]).map(x=>`<li style="font-size:12.5px">${esc(x)}</li>`).join("");
+  const agCard=TOK
+    ?`<div class="card"><b>🗒 Agenda</b> <span class="muted" style="font-size:12px">anything — a wish, a bug, an idea; the next chat session picks it up</span>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="agin" class="inp" placeholder="e.g. the chart tooltip overlaps the legend" style="flex:1;min-width:0">
+        <button id="aggo" class="bp">Queue</button></div>
+      <div id="agmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div>
+      ${agItems?`<ul style="padding-left:18px;margin-top:6px">${agItems}</ul>`:""}</div>`
+    :"";
   const askCard=TOK
     ?`<div class="card"><b>➕ Ask about a ticker</b>
       <div class="muted" style="font-size:12.5px;margin-top:2px">tomorrow morning's run gives it the full audit</div>
@@ -882,7 +891,7 @@ function render(D){
       <div id="wmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
     :"";
   $("#t-more").innerHTML=`<h2>Actions</h2>
-    ${tokCard}${askCard}${remoteCard}
+    ${tokCard}${askCard}${agCard}${remoteCard}
     <h2>Edit the system's files <span class="muted" style="font-weight:400">(saved straight from the app; the next run reads them)</span></h2>
     ${fileCards}
     <h2>Pending asks</h2><div class="card" id="askpend">${asks?`<ul style="padding-left:18px">${asks}</ul>`:'<p class="muted">none queued</p>'}</div>
@@ -906,6 +915,18 @@ function render(D){
   const _o=$("#tokoff");if(_o)_o.onclick=ev=>{ev.preventDefault();
     TOK="";localStorage.removeItem("mc_tok");render(DATA)};
   const _a=$("#askgo");if(_a)_a.onclick=()=>sendAsk();
+  const _ag=$("#aggo");if(_ag)_ag.onclick=async()=>{
+    const inp=$("#agin"),m=$("#agmsg");
+    const v=((inp&&inp.value)||"").trim();
+    if(!v){if(m)m.textContent="type something first";return}
+    if(m)m.textContent="queuing…";
+    try{
+      const {text,sha}=await ghGet("Investing/agenda.txt");
+      await ghPut("Investing/agenda.txt",text.replace(/\s*$/,"\n")+v+"\n",sha,"app: agenda item");
+      if(inp)inp.value="";
+      (DATA.agenda=DATA.agenda||[]).push(v);
+      if(m)m.textContent="queued ✓ — the next chat session picks it up";
+    }catch(e){if(m)m.textContent=e.message}};
   refreshAsks();   // async: swap the payload's ask list for the live file
   document.querySelectorAll(".hsave").forEach(b=>b.onclick=()=>saveOneShare(b.dataset.t));
   document.querySelectorAll(".htr").forEach(b=>b.onclick=()=>openTrade(b.dataset.t));
