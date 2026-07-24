@@ -706,7 +706,7 @@ function render(D){
       return `<div style="display:flex;gap:8px;align-items:baseline;margin-top:6px">
         <span class="${s.tripped?"good":"muted"}" style="flex:none;font-size:13px">${s.tripped?"✓":"○"}</span>
         <div style="flex:1;min-width:0"><b style="font-size:13px">$${s.price}</b>
-          <span class="muted" style="font-size:12px"> · ~$${s.amount||0}${
+          <span class="muted" style="font-size:12px">${s.amount?` · ~$${s.amount}`:""}${
             s.tripped?` · hit ${esc(s.tripped)}`
             :dist!=null?(dist>0?` · ${dist.toFixed(1)}% away`:" · in range now")
             :""}</span>
@@ -714,8 +714,10 @@ function render(D){
           ${s.verdict?`<div style="font-size:11.5px;color:var(--ink2)">${esc(s.verdict)}</div>`:""}</div></div>`;}).join("");
     return `<div class="card"${done?' style="opacity:.75"':""}>
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-        <b><span class="tk">$${esc(p.ticker)}</span> ${dir==="enter"?"⬇ entry":"⬆ exit"} · $${p.dollars||0}</b>
-        ${TOK&&!done?`<a href="#" class="plkill" data-k="${esc(p.ticker)}|${esc(p.created||"")}" style="color:var(--bad);font-size:12px;flex:none">✕ kill</a>`:""}</div>
+        <b><span class="tk">$${esc(p.ticker)}</span> ${dir==="enter"?"⬇ entry":"⬆ exit"}${p.dollars?` · $${p.dollars}`:` · <span class="muted" style="font-weight:400">size undecided — timing only</span>`}</b>
+        ${TOK?`<span style="flex:none;font-size:12px;display:flex;gap:12px">
+          <a href="#" class="plact" data-act="archived" data-k="${esc(p.ticker)}|${esc(p.created||"")}" style="color:var(--good);font-weight:600">✓ done</a>
+          ${done?"":`<a href="#" class="plact" data-act="killed" data-k="${esc(p.ticker)}|${esc(p.created||"")}" style="color:var(--bad)">✕ kill</a>`}</span>`:""}</div>
       ${p.note?`<div class="muted" style="font-size:12px">${esc(p.note)}</div>`:""}
       ${slices}
       <div class="muted" style="font-size:11.5px;margin-top:6px">${done
@@ -729,11 +731,11 @@ function render(D){
     ?`<div class="card fx"><div class="whead"><b>🎯 Queue an entry/exit plan</b>
         <span class="muted" style="margin-left:auto;font-size:11.5px;flex:none">tap to open</span><span class="hchev">▾</span></div>
       <div class="hbody"><div>
-        <div class="muted" style="font-size:12.5px;margin-top:8px">ticker, direction, rough $ — the next chat session slices it into reasoned price levels (free); the watcher then pings your phone when one hits</div>
+        <div class="muted" style="font-size:12.5px;margin-top:8px">ticker + direction; $ is optional (leave it blank and the plan just tells you WHEN — you size at fill time). Queue as many as you like — each becomes its own card.</div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <input id="plt" class="inp" placeholder="SMH" style="width:80px;text-transform:uppercase">
           <select id="pld" class="inp" style="width:88px;flex:none"><option value="enter">enter</option><option value="exit">exit</option></select>
-          <input id="pla" class="inp" type="number" inputmode="decimal" placeholder="$250" style="flex:1;min-width:70px">
+          <input id="pla" class="inp" type="number" inputmode="decimal" placeholder="$ optional" style="flex:1;min-width:70px">
         </div>
         <input id="pln" class="inp" placeholder="optional note — e.g. only on a real dip" style="width:100%;margin-top:6px">
         <button id="plgo" class="bp" style="width:100%;margin-top:8px">Queue plan request</button>
@@ -997,30 +999,33 @@ function render(D){
     const a=parseFloat(($("#pla")||{}).value);
     const n=(($("#pln")||{}).value||"").trim();
     if(!/^[A-Z][A-Z0-9.\-]{0,5}$/.test(t)){if(m)m.textContent="ticker looks off — 1-6 letters/numbers";return}
-    if(!(a>0)){if(m)m.textContent="roughly how many dollars? any number works";return}
     if(m)m.textContent="queuing…";
     try{
-      const line=`${t} ${d} ${a}${n?" "+n:""}`;
+      // $ optional (2026-07-24): blank = "size undecided" — the plan becomes
+      // timing-only (a level ladder that tells you WHEN, you size at fill)
+      const line=`${t} ${d} ${a>0?a:"?"}${n?" "+n:""}`;
       const {text,sha}=await ghGet("Investing/plan_queue.txt");
       await ghPut("Investing/plan_queue.txt",text.replace(/\s*$/,"\n")+line+"\n",sha,"app: plan request "+t);
       (DATA.plan_queue=DATA.plan_queue||[]).push(line);
       ["plt","pla","pln"].forEach(id=>{const e=$("#"+id);if(e)e.value=""});
       if(m)m.textContent="queued ✓ — the sliced plan lands next chat session";
     }catch(e){if(m)m.textContent=e.message}};
-  document.querySelectorAll(".plkill").forEach(b=>b.onclick=async ev=>{
+  document.querySelectorAll(".plact").forEach(b=>b.onclick=async ev=>{
     ev.preventDefault();
-    if(b._arm!==1){b._arm=1;b.textContent="tap again to kill";return}
-    b.textContent="killing…";
+    const act=b.dataset.act==="archived"?"archived":"killed";
+    if(b._arm!==1){b._arm=1;
+      b.textContent=act==="archived"?"tap again — done ✓":"tap again to kill";return}
+    b.textContent=act==="archived"?"archiving…":"killing…";
     try{
       const {text,sha}=await ghGet("Investing/entry_plans.json");
       const doc=JSON.parse(text);
       const [tk,cr]=(b.dataset.k||"").split("|");
       const p=(doc.plans||[]).find(x=>x.ticker===tk
-        &&String(x.created||"")===cr&&x.status!=="killed");
+        &&String(x.created||"")===cr&&!["killed","archived"].includes(x.status));
       if(!p){b.textContent="not found — refresh";return}
-      p.status="killed";p.killed=new Date().toISOString().slice(0,10);
+      p.status=act;p[act]=new Date().toISOString().slice(0,10);
       await ghPut("Investing/entry_plans.json",
-        JSON.stringify(doc,null,1)+"\n",sha,"app: kill plan "+tk);
+        JSON.stringify(doc,null,1)+"\n",sha,`app: ${act==="archived"?"done":"kill"} plan ${tk}`);
       DATA.plans=(DATA.plans||[]).filter(x=>!(x.ticker===tk&&String(x.created||"")===cr));
       render(DATA);
     }catch(e){b.textContent=e.message}});
