@@ -650,9 +650,9 @@ function render(D){
     <div class="bignum">${bookN?usd(bookTot):"—"}</div>
     ${bookCost>0?(()=>{const pl=bookCostVal-bookCost,r=pl/bookCost*100;
       return `<div class="${pl>=0?"good":"bad"}" style="font-size:13px;font-weight:600;margin-top:2px">${pl>=0?"+":"−"}${usd(Math.abs(pl))} (${r>=0?"+":""}${r.toFixed(1)}%) vs what you paid${bookCostN<bookN?` <span class="muted" style="font-weight:400">(${bookCostN} of ${bookN} with an avg cost)</span>`:""}</div>`})():""}
-    <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""} ·
-    ${TOK?`<a href="#" id="trbtn" style="font-weight:600">⇄ record a trade</a>`
-         :`<a href="#" id="needtok">turn on in-app editing (More tab)</a>`}</div>
+    <div class="muted" style="font-size:12.5px">${bookN} of ${ph.length} valued${noQuote?` · ${noQuote} awaiting a price (next run)`:""}</div>
+    ${TOK?`<button id="trbtn" class="bs" style="margin-top:10px;padding:7px 15px;font-size:13px;width:auto">⇄ Record a trade</button>`
+         :`<div style="font-size:12.5px;margin-top:7px"><a href="#" id="needtok">Turn on in-app editing (More tab)</a> to trade from here</div>`}
     ${bookCurve(D.book)}
     ${(D.book_idx&&D.book_idx.length>=2)?`<div class="muted" style="font-size:11px;margin-top:4px">dollar curve — money you add moves it. The Home chart's book line is deposit-proof (time-weighted).</div>`:""}</div>
     <div id="shed"></div>`;
@@ -720,17 +720,23 @@ function render(D){
         ?"complete — every level hit"
         :`fallback ${esc(p.fallback||"—")} — unfilled slices fire a decision alert${p.fallback_fired?` (FIRED ${esc(p.fallback_fired)})`:""}`}</div></div>`;}).join("");
   const pqItems=(D.plan_queue||[]).map(x=>`<li style="font-size:12.5px">${esc(x)} <span class="muted">— sliced plan arrives next chat session</span></li>`).join("");
+  // collapsed by default — a clean tappable header that expands the form via
+  // the shared .fx/.whead accordion (same mechanism as the fund sections),
+  // so the Book tab isn't cluttered by an always-open form (Anthony 2026-07-24)
   const planBox=TOK
-    ?`<div class="card"><b>🎯 Queue an entry/exit plan</b>
-      <div class="muted" style="font-size:12.5px;margin-top:2px">ticker, direction, rough $ — the next chat session slices it into reasoned price levels (free); the watcher then pings your phone when one hits</div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <input id="plt" class="inp" placeholder="SMH" style="width:80px;text-transform:uppercase">
-        <select id="pld" class="inp" style="width:88px;flex:none"><option value="enter">enter</option><option value="exit">exit</option></select>
-        <input id="pla" class="inp" type="number" inputmode="decimal" placeholder="$250" style="flex:1;min-width:70px">
-      </div>
-      <input id="pln" class="inp" placeholder="optional note — e.g. only on a real dip" style="width:100%;margin-top:6px">
-      <button id="plgo" class="bp" style="width:100%;margin-top:8px">Queue plan request</button>
-      <div id="plmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
+    ?`<div class="card fx"><div class="whead"><b>🎯 Queue an entry/exit plan</b>
+        <span class="muted" style="margin-left:auto;font-size:11.5px;flex:none">tap to open</span><span class="hchev">▾</span></div>
+      <div class="hbody"><div>
+        <div class="muted" style="font-size:12.5px;margin-top:8px">ticker, direction, rough $ — the next chat session slices it into reasoned price levels (free); the watcher then pings your phone when one hits</div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input id="plt" class="inp" placeholder="SMH" style="width:80px;text-transform:uppercase">
+          <select id="pld" class="inp" style="width:88px;flex:none"><option value="enter">enter</option><option value="exit">exit</option></select>
+          <input id="pla" class="inp" type="number" inputmode="decimal" placeholder="$250" style="flex:1;min-width:70px">
+        </div>
+        <input id="pln" class="inp" placeholder="optional note — e.g. only on a real dip" style="width:100%;margin-top:6px">
+        <button id="plgo" class="bp" style="width:100%;margin-top:8px">Queue plan request</button>
+        <div id="plmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div>
+      </div></div></div>`
     :`<div class="card"><b>🎯 Entry/exit plans</b>
       <div class="muted" style="font-size:12.5px;margin-top:3px">turn on in-app editing (More tab) to queue plan requests from here</div></div>`;
   const plansSec=`<h2>Plans <span class="muted" style="font-weight:400">(levels watched every 30 min, free · alerts only, never trades)</span></h2>
