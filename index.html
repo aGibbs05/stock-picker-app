@@ -677,8 +677,6 @@ function render(D){
     <div class="hbody"><div>
       ${v!=null?`<div class="muted" style="font-size:12px;margin-top:8px">${esc(h.shares)} sh @ ${usd(h.quote)}${h.cost>0?(()=>{const r=(h.quote/h.cost-1)*100;return ` · <span class="${r>=0?"good":"bad"}" style="font-weight:600">${r>=0?"+":""}${r.toFixed(1)}% vs avg ${usd(h.cost)}</span>`})():""}${si}</div>`
       :(h.shares!=null?`<div class="muted" style="font-size:12px;margin-top:8px">price arrives with the next run${si}</div>`:(si?`<div style="margin-top:8px">${si}</div>`:""))}
-      ${h.pt>0&&h.quote>0?(()=>{const u=(h.pt/h.quote-1)*100;
-        return `<div class="muted" style="font-size:12px;margin-top:5px">🎯 analysts avg ${usd(h.pt)} <span class="${u>=0?"good":"bad"}" style="font-weight:600">(${u>=0?"+":""}${u.toFixed(0)}% vs now)</span>${h.reco?` · rated ${esc(String(h.reco).replace(/_/g," "))}`:""}</div>`})():""}
       ${TOK?`<button class="htr bp" data-t="${esc(h.ticker)}" style="width:100%;margin-top:10px">⇄ Trade ${esc(h.ticker)}</button>
       <div style="display:flex;gap:8px;margin-top:8px">
       <input class="hsin inp" data-t="${esc(h.ticker)}" type="text" inputmode="decimal" value="${h.shares!=null?esc(h.shares):""}" placeholder="shares" style="flex:1;min-width:0">
@@ -809,6 +807,7 @@ function render(D){
       <div class="nwrap"><div><table style="width:100%;margin-top:6px"><thead><tr><th></th><th class="num" style="font-size:11px">${esc(t)}</th><th class="num muted" style="font-size:11px">comps median</th></tr></thead>
       ${nRow("P/E trailing",fPe(n.pe_t),fPe(c2.pe_t))}
       ${nRow("P/E forward",fPe(n.pe_f),fPe(c2.pe_f))}
+      ${n.pt!=null?nRow("Analyst avg target","$"+(+n.pt).toFixed(0)+(n.pt_up!=null?` <span class="${n.pt_up>=0?"good":"bad"}" style="font-size:11px">(${fPct2(n.pt_up)} vs price)</span>`:""),"—"):""}
       ${nRow("Rev growth (yr)",n.rev_g1!=null?fPct2(n.rev_g1)+(n.rev_g2!=null?` <span class="muted" style="font-size:11px">(prior yr ${fPct2(n.rev_g2)})</span>`:""):"—",fPct2(c2.rev_g1))}
       ${nRow("EPS (12mo)",n.eps!=null?"$"+(+n.eps).toFixed(2):"—",`<span style="font-size:11px">not comparable</span>`)}
       ${nRow("Debt / equity",n.de!=null?(+n.de/100).toFixed(2):"—",c2.de!=null?(+c2.de/100).toFixed(2):"—")}
