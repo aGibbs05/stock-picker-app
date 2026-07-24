@@ -689,7 +689,55 @@ function render(D){
         +hist.map(r=>{const s=r.snap||{};const eg=s.smh_edge??s.bench_edge??s.edge;
           return `<div style="font-size:12.5px;color:var(--ink2);margin-top:5px">${mdy(r.date)} · T${esc(r.tier??"—")}${r.winner?" · pick of the day":""}${s.ret!=null?` · ${pp(s.ret).replace("pp","%")} (${r.snap_days}d)`:""}${eg!=null?` · edge ${pp(eg)}`:""}${r.rv?`<div class="muted" style="font-size:11.5px">${esc(r.rv)}</div>`:""}</div>`}).join(""):""}
     </div></div></div>`}).join("");
-  $("#t-book").innerHTML=`${bookHead}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}`;
+  // ── Entry/exit plans (2026-07-24): queue box + authored plan cards.
+  // Plans are AUTHORED free in chat sessions from plan_queue.txt; the
+  // 30-min watcher pushes when a level trips. Notification-only by design.
+  const _pq=t=>{const p=(D.personal||[]).find(x=>x.ticker===t);
+    return p&&p.quote!=null?p.quote:null};
+  const planCards=(D.plans||[]).map(p=>{
+    const dir=p.direction==="exit"?"exit":"enter";
+    const px=_pq(p.ticker);
+    const done=p.status==="done";
+    const slices=(p.slices||[]).map(s=>{
+      const dist=(px!=null&&s.price)
+        ?(dir==="enter"?(px-s.price)/px:(s.price-px)/px)*100:null;
+      return `<div style="display:flex;gap:8px;align-items:baseline;margin-top:6px">
+        <span class="${s.tripped?"good":"muted"}" style="flex:none;font-size:13px">${s.tripped?"✓":"○"}</span>
+        <div style="flex:1;min-width:0"><b style="font-size:13px">$${s.price}</b>
+          <span class="muted" style="font-size:12px"> · ~$${s.amount||0}${
+            s.tripped?` · hit ${esc(s.tripped)}`
+            :dist!=null?(dist>0?` · ${dist.toFixed(1)}% away`:" · in range now")
+            :""}</span>
+          ${s.why?`<div class="muted" style="font-size:11.5px">${esc(s.why)}</div>`:""}
+          ${s.verdict?`<div style="font-size:11.5px;color:var(--ink2)">${esc(s.verdict)}</div>`:""}</div></div>`;}).join("");
+    return `<div class="card"${done?' style="opacity:.75"':""}>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+        <b><span class="tk">$${esc(p.ticker)}</span> ${dir==="enter"?"⬇ entry":"⬆ exit"} · $${p.dollars||0}</b>
+        ${TOK&&!done?`<a href="#" class="plkill" data-k="${esc(p.ticker)}|${esc(p.created||"")}" style="color:var(--bad);font-size:12px;flex:none">✕ kill</a>`:""}</div>
+      ${p.note?`<div class="muted" style="font-size:12px">${esc(p.note)}</div>`:""}
+      ${slices}
+      <div class="muted" style="font-size:11.5px;margin-top:6px">${done
+        ?"complete — every level hit"
+        :`fallback ${esc(p.fallback||"—")} — unfilled slices fire a decision alert${p.fallback_fired?` (FIRED ${esc(p.fallback_fired)})`:""}`}</div></div>`;}).join("");
+  const pqItems=(D.plan_queue||[]).map(x=>`<li style="font-size:12.5px">${esc(x)} <span class="muted">— sliced plan arrives next chat session</span></li>`).join("");
+  const planBox=TOK
+    ?`<div class="card"><b>🎯 Queue an entry/exit plan</b>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">ticker, direction, rough $ — the next chat session slices it into reasoned price levels (free); the watcher then pings your phone when one hits</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="plt" class="inp" placeholder="SMH" style="width:80px;text-transform:uppercase">
+        <select id="pld" class="inp" style="width:88px;flex:none"><option value="enter">enter</option><option value="exit">exit</option></select>
+        <input id="pla" class="inp" type="number" inputmode="decimal" placeholder="$250" style="flex:1;min-width:70px">
+      </div>
+      <input id="pln" class="inp" placeholder="optional note — e.g. only on a real dip" style="width:100%;margin-top:6px">
+      <button id="plgo" class="bp" style="width:100%;margin-top:8px">Queue plan request</button>
+      <div id="plmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`
+    :`<div class="card"><b>🎯 Entry/exit plans</b>
+      <div class="muted" style="font-size:12.5px;margin-top:3px">turn on in-app editing (More tab) to queue plan requests from here</div></div>`;
+  const plansSec=`<h2>Plans <span class="muted" style="font-weight:400">(levels watched every 30 min, free · alerts only, never trades)</span></h2>
+    ${planBox}
+    ${pqItems?`<div class="card"><b>Queued requests</b><ul style="padding-left:18px;margin-top:6px">${pqItems}</ul></div>`:""}
+    ${planCards}`;
+  $("#t-book").innerHTML=`${bookHead}${plansSec}<h2>Your holdings (${ph.length})</h2>${hold||'<p class="muted">—</p>'}`;
 
   // RADAR — calendar-style event cards (visual rework, Anthony 2026-07-18)
   const heldset=new Set([...ph.map(h=>h.ticker),...rows.map(r=>r.ticker)]);
@@ -932,6 +980,42 @@ function render(D){
   document.querySelectorAll(".htr").forEach(b=>b.onclick=()=>openTrade(b.dataset.t));
   document.querySelectorAll(".hhead").forEach(hd=>hd.onclick=()=>{
     const c=hd.parentNode;if(c&&c.classList)c.classList.toggle("open");});
+  // Plans wiring (2026-07-24) — lives HERE in the late block on purpose:
+  // the Book tab's markup must exist before these bind (source-order contract)
+  const _plg=$("#plgo");if(_plg)_plg.onclick=async()=>{
+    const m=$("#plmsg");
+    const t=(($("#plt")||{}).value||"").trim().toUpperCase().replace(/^\$/,"");
+    const d=(($("#pld")||{}).value)==="exit"?"exit":"enter";
+    const a=parseFloat(($("#pla")||{}).value);
+    const n=(($("#pln")||{}).value||"").trim();
+    if(!/^[A-Z][A-Z0-9.\-]{0,5}$/.test(t)){if(m)m.textContent="ticker looks off — 1-6 letters/numbers";return}
+    if(!(a>0)){if(m)m.textContent="roughly how many dollars? any number works";return}
+    if(m)m.textContent="queuing…";
+    try{
+      const line=`${t} ${d} ${a}${n?" "+n:""}`;
+      const {text,sha}=await ghGet("Investing/plan_queue.txt");
+      await ghPut("Investing/plan_queue.txt",text.replace(/\s*$/,"\n")+line+"\n",sha,"app: plan request "+t);
+      (DATA.plan_queue=DATA.plan_queue||[]).push(line);
+      ["plt","pla","pln"].forEach(id=>{const e=$("#"+id);if(e)e.value=""});
+      if(m)m.textContent="queued ✓ — the sliced plan lands next chat session";
+    }catch(e){if(m)m.textContent=e.message}};
+  document.querySelectorAll(".plkill").forEach(b=>b.onclick=async ev=>{
+    ev.preventDefault();
+    if(b._arm!==1){b._arm=1;b.textContent="tap again to kill";return}
+    b.textContent="killing…";
+    try{
+      const {text,sha}=await ghGet("Investing/entry_plans.json");
+      const doc=JSON.parse(text);
+      const [tk,cr]=(b.dataset.k||"").split("|");
+      const p=(doc.plans||[]).find(x=>x.ticker===tk
+        &&String(x.created||"")===cr&&x.status!=="killed");
+      if(!p){b.textContent="not found — refresh";return}
+      p.status="killed";p.killed=new Date().toISOString().slice(0,10);
+      await ghPut("Investing/entry_plans.json",
+        JSON.stringify(doc,null,1)+"\n",sha,"app: kill plan "+tk);
+      DATA.plans=(DATA.plans||[]).filter(x=>!(x.ticker===tk&&String(x.created||"")===cr));
+      render(DATA);
+    }catch(e){b.textContent=e.message}});
   // tap a comparable's ticker inside a report → filter the library to it
   document.querySelectorAll(".wcomp").forEach(a=>a.onclick=ev=>{ev.preventDefault();
     const ws2=$("#wsearch");if(ws2){ws2.value=a.dataset.t;filterReports(a.dataset.t);}});
