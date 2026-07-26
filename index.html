@@ -319,6 +319,13 @@ const tk=t=>`<span class="tk">$${esc(t)}</span>`;   // tickers are always blue
 const mdy=d=>{const p=String(d||"").split("-");
   return p.length===3?`${+p[1]}/${+p[2]}/${p[0].slice(2)}`:esc(d)};
 const shfmt=v=>v==null?"—":String(+(+v).toFixed(4));
+// Values read back out of holdings.txt may carry thousands separators or a $.
+// The python side strips them (sp.get_holdings_with_shares), so the app MUST
+// too — a bare parseFloat("1,234") returns 1, and the two sides then disagree
+// about how much you own. Found by the QA swarm 2026-07-26: with a comma in the
+// file, "sell all" computed held=1, matched the sell, and DELETED the position.
+const num=v=>{const n=parseFloat(String(v??"").replace(/[$,\s]/g,""));
+  return Number.isFinite(n)?n:NaN;};
 // github-editable files that get IN-APP editors on the More tab
 const FILES=[
  ["👤 Callers","Investing/fintwit_accounts.txt",
@@ -997,7 +1004,7 @@ function render(D){
     const m=$("#plmsg");
     const t=(($("#plt")||{}).value||"").trim().toUpperCase().replace(/^\$/,"");
     const d=(($("#pld")||{}).value)==="exit"?"exit":"enter";
-    const a=parseFloat(($("#pla")||{}).value);
+    const a=num(($("#pla")||{}).value);
     const n=(($("#pln")||{}).value||"").trim();
     if(!/^[A-Z][A-Z0-9.\-]{0,5}$/.test(t)){if(m)m.textContent="ticker looks off — 1-6 letters/numbers";return}
     if(m)m.textContent="queuing…";
@@ -1190,7 +1197,7 @@ function drawShares(ed,rows){
       // reflect immediately: keep known quotes, swap in the new share counts
       const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
       DATA.personal=ed._rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
-        ticker:r.t,shares:r.s?parseFloat(r.s):null,cost:r.c?parseFloat(r.c):null}));
+        ticker:r.t,shares:r.s?num(r.s):null,cost:r.c?num(r.c):null}));
       render(DATA);
       $("#shmsg")&&($("#shmsg").textContent="saved ✓");
     }catch(e){
@@ -1230,7 +1237,7 @@ function computeTrade(rows,side,tRaw,priceRaw,dollarsRaw,sharesRaw){
   let summary="",newTicker=false,avgWarn=false;
   if(side==="sell"){
     if(i<0)return{ok:false,err:`you don't hold ${t}`};
-    const held=parseFloat(out[i].s||"0");
+    const held=num(out[i].s||"0");
     if(!(held>0))return{ok:false,err:`${t} has no share count on file — set it in the holding's edit box first`};
     if(sellAll)sh=held;
     if(!(sh>0))sh=usd_/px;
@@ -1240,15 +1247,15 @@ function computeTrade(rows,side,tRaw,priceRaw,dollarsRaw,sharesRaw){
     if(sh>=held-1e-6){out.splice(i,1);
       summary=`SELL ALL ${held} sh ${t} @ ${usd(px)} = ${usd(held*px)} — position closed, card removed`;}
     else{const left=Math.round((held-sh)*1e6)/1e6;out[i].s=String(left);
-      summary=`SELL ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — ${left} sh remain, avg unchanged${out[i].c?` (${usd(parseFloat(out[i].c))})`:""}`;}
+      summary=`SELL ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — ${left} sh remain, avg unchanged${out[i].c?` (${usd(num(out[i].c))})`:""}`;}
   }else{
     if(!(sh>0))sh=usd_/px;
     usd_=sh*px;
     sh=Math.round(sh*1e6)/1e6;
     if(i<0){out.push({t,s:String(sh),c:String(Math.round(px*1e4)/1e4)});newTicker=true;
       summary=`BUY ${sh} sh ${t} @ ${usd(px)} = ${usd(usd_)} — NEW holding, avg ${usd(px)}`;}
-    else{const held=parseFloat(out[i].s||"0")||0;
-      const oldAvg=parseFloat(out[i].c||"");
+    else{const held=num(out[i].s||"0")||0;
+      const oldAvg=num(out[i].c||"");
       const tot=Math.round((held+sh)*1e6)/1e6;
       let avg;
       if(held>0&&oldAvg>0)avg=(held*oldAvg+sh*px)/tot;
@@ -1331,7 +1338,7 @@ function openTrade(preT){
       // reflect locally + pin against stale-payload refreshes (DPRO ghost)
       const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
       DATA.personal=res.rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
-        ticker:r.t,shares:r.s?parseFloat(r.s):null,cost:r.c?parseFloat(r.c):null}));
+        ticker:r.t,shares:r.s?num(r.s):null,cost:r.c?num(r.c):null}));
       _saveBookOv();
       const sy=window.scrollY||0;
       render(DATA);   // rebuilds the Book tab (form clears) — confirm below
@@ -1358,7 +1365,10 @@ async function saveOneShare(t){
   const msg=document.querySelector(`.hmsg[data-t="${t}"]`);
   const val=((inp&&inp.value)||"").trim();
   const cval=((cinp&&cinp.value)||"").trim().replace(/^\$/,"");
-  if(cval&&!(parseFloat(cval)>0)){if(msg)msg.textContent=`"${cval}" isn't a price`;return}
+  if(cval&&!(num(cval)>0)){if(msg)msg.textContent=`"${cval}" isn't a price`;return}
+  // A non-numeric share box used to sail through, write junk into
+  // holdings.txt, render the whole book as "$NaN" — and still say saved ✓.
+  if(val&&!(num(val)>=0)){if(msg)msg.textContent=`"${val}" isn't a share count`;return}
   if(msg)msg.textContent="saving…";
   const mkline=(keep)=>!val?t:(cval?`${t} ${val} ${cval}`
     :(keep?`${t} ${val} ${keep}`:`${t} ${val}`));
@@ -1376,8 +1386,8 @@ async function saveOneShare(t){
     await ghPut("Investing/holdings.txt",out.join("\n"),sha,
                 `app: ${t} share count`);
     const h=(DATA.personal||[]).find(x=>x.ticker===t);
-    if(h){h.shares=val?parseFloat(val):null;
-      if(cval)h.cost=parseFloat(cval);}
+    if(h){h.shares=val?num(val):null;
+      if(cval)h.cost=num(cval);}
     _saveBookOv();
     const sy1=window.scrollY||0;
     render(DATA);
