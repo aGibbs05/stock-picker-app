@@ -727,7 +727,14 @@ function render(D){
   // Plans are AUTHORED free in chat sessions from plan_queue.txt; the
   // 30-min watcher pushes when a level trips. Notification-only by design.
   const _pq=t=>{const p=(D.personal||[]).find(x=>x.ticker===t);
-    return p&&p.quote!=null?p.quote:null};
+    if(p&&p.quote!=null)return p.quote;
+    // Entry plans are normally for tickers you do NOT own yet, so `personal`
+    // has no quote and every slice rendered without a distance (QA swarm
+    // 2026-07-26). Fall back to any other quote the payload carries.
+    const fr=((D.fund||{}).rows||[]).find(x=>x.ticker===t&&x.px!=null);
+    if(fr)return fr.px;
+    const tr=(D.track||[]).slice().reverse().find(x=>x.ticker===t&&x.snap!=null);
+    return tr?tr.snap:null;};
   // Killed/archived plans are filtered by the publisher, but the app must not
   // DEPEND on that: a locally-pinned override or a stale payload can still
   // carry one, and it would render with live kill/done links (QA swarm
@@ -791,7 +798,11 @@ function render(D){
   const heldset=new Set([...ph.map(h=>h.ticker),...rows.map(r=>r.ticker)]);
   const MONTHS=["JAN","FEB","MAR","APR","MAY","JUN",
                 "JUL","AUG","SEP","OCT","NOV","DEC"];
-  const tnow=Date.parse(D.today||"");
+  // Use the REAL current date, not the payload's publish date — a phone
+  // showing a cached payload was labelling past events "TODAY" (QA swarm
+  // 2026-07-26). Fall back to the payload date only if the clock is unusable.
+  const _rt=new Date(); _rt.setHours(0,0,0,0);
+  const tnow=isNaN(_rt.getTime())?Date.parse(D.today||""):_rt.getTime();
   const evs=(D.calendar||[]).map(e=>{
     const t=Date.parse(e.date);
     const d=isFinite(t)&&isFinite(tnow)?Math.round((t-tnow)/864e5):null;
@@ -1420,6 +1431,7 @@ async function saveOneShare(t){
   // holdings.txt, render the whole book as "$NaN" — and still say saved ✓.
   if(val&&!(num(val)>=0)){if(msg)msg.textContent=`"${val}" isn't a share count`;return}
   if(msg)msg.textContent="saving…";
+  let _costWarn=null;
   const mkline=(keep)=>!val?t:(cval?`${t} ${val} ${cval}`
     :(keep?`${t} ${val} ${keep}`:`${t} ${val}`));
   try{
@@ -1429,10 +1441,19 @@ async function saveOneShare(t){
       const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
       if(p.length&&p[0].toUpperCase().replace(/^\$/,"")===t){
         found=true;
+        // holdings.txt is positional ("TICKER shares cost"), so clearing the
+        // share count necessarily drops the cost with it. That used to happen
+        // SILENTLY while the app kept showing the old cost (QA swarm
+        // 2026-07-26) — make it a deliberate act instead.
+        if(!val&&!cval&&p[2])_costWarn=p[2];
         // avg box wins; empty avg box keeps the existing token (p[2])
         return mkline(p[2]);}
       return line;});
     if(!found)out.push(mkline(""));
+    if(_costWarn){
+      if(msg)msg.textContent="clearing the share count would also delete the $"
+        +_costWarn+" avg cost on file — clear the avg box too if you mean it";
+      return;}
     await ghPut("Investing/holdings.txt",out.join("\n"),sha,
                 `app: ${t} share count`);
     const h=(DATA.personal||[]).find(x=>x.ticker===t);
