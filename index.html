@@ -502,8 +502,20 @@ function wireCharts(){
       if(xl){xl.style.display="block";
         xl.style.left=(cx-ch.getBoundingClientRect().left)+"px";}
     };
-    ch.addEventListener("touchstart",e=>{const t=e.touches[0];if(t)move(t.clientX)},{passive:true});
-    ch.addEventListener("touchmove",e=>{const t=e.touches[0];if(t){move(t.clientX);e.preventDefault()}},{passive:false});
+    ch.addEventListener("touchstart",e=>{const t=e.touches[0];
+      // remember where the finger landed so touchmove can tell a horizontal
+      // scrub from a vertical page scroll (QA swarm 2026-07-26)
+      if(t){ch._sx=t.clientX;ch._sy=t.clientY;ch._own=null;move(t.clientX)}},{passive:true});
+    ch.addEventListener("touchmove",e=>{
+      // only claim the gesture once it's clearly HORIZONTAL, or the chart
+      // swallows every attempt to scroll the page (QA swarm 2026-07-26)
+      const _t0=e.touches&&e.touches[0];
+      if(_t0&&ch._sy!=null&&ch._sx!=null){
+        const dx=Math.abs(_t0.clientX-ch._sx),dy=Math.abs(_t0.clientY-ch._sy);
+        if(dy>dx&&dy>8){ch._own=false;return}      // vertical → let the page scroll
+        if(dx>6)ch._own=true;
+      }
+      if(ch._own===false)return;const t=e.touches[0];if(t){move(t.clientX);e.preventDefault()}},{passive:false});
     ch.addEventListener("mousemove",e=>move(e.clientX));
     ch.addEventListener("touchend",()=>{const xl=ch.querySelector(".xline");
       if(xl)xl.style.display="none"},{passive:true});
@@ -564,6 +576,13 @@ function emailCards(e){
     ${fmtBody(s.lines)}</div>`).join("");
 }
 
+function _savePlanOv(){
+  // pin locally killed/archived plans (QA swarm 2026-07-26). Without this the
+  // next auto-refresh serves the pre-kill payload and the card comes BACK —
+  // the plans version of the DPRO ghost the book was fixed for on 7/23.
+  try{localStorage.setItem("mc_plan_ov",
+    JSON.stringify({at:Date.now(),plans:DATA.plans||[]}))}catch(e){}
+}
 function _saveBookOv(){
   // pin the locally-edited book so a stale-payload refresh can't resurrect a
   // sold position (the DPRO ghost, 2026-07-23) — 10 min outlives the publish
@@ -578,6 +597,12 @@ function render(D){
       const gen=Date.parse(String(D.generated||"").replace(" ","T")+":00Z");
       if(gen>ov.at)localStorage.removeItem("mc_book_ov");
       else D.personal=ov.rows;
+    }
+    const pov=JSON.parse(localStorage.getItem("mc_plan_ov")||"null");
+    if(pov&&pov.plans&&Date.now()-pov.at<600000){
+      const gen2=Date.parse(String(D.generated||"").replace(" ","T")+":00Z");
+      if(gen2>pov.at)localStorage.removeItem("mc_plan_ov");
+      else D.plans=pov.plans;
     }else if(ov)localStorage.removeItem("mc_book_ov");
   }catch(e){}
   $("#stamp").textContent="as of "+D.generated+" · updates with each run";
@@ -671,7 +696,7 @@ function render(D){
     const nm=((D.writeups||{})[h.ticker]||{}).company||"";
     const hue=[...h.ticker].reduce((a,c)=>a+c.charCodeAt(0)*7,0)%360;
     const day=h.day_pct!=null
-      ?`<span class="daychip ${h.day_pct>=0?"good":"bad"}">${h.day_pct>=0?"↑":"↓"} ${Math.abs(h.day_pct).toFixed(1)}% today</span>`:"";
+      ?`<span class="daychip ${h.day_pct>=0?"good":"bad"}">${h.day_pct>=0?"↑":"↓"} ${Math.abs(h.day_pct).toFixed(1)}% last close</span>`:"";
     const hist=(D.track||[]).filter(r=>r.ticker===h.ticker).slice(-5).reverse();
     const camp=(D.camping||[]).find(c=>c.ticker===h.ticker);
     return `<div class="card hcard" data-ht="${esc(h.ticker)}">
@@ -703,7 +728,13 @@ function render(D){
   // 30-min watcher pushes when a level trips. Notification-only by design.
   const _pq=t=>{const p=(D.personal||[]).find(x=>x.ticker===t);
     return p&&p.quote!=null?p.quote:null};
-  const planCards=(D.plans||[]).map(p=>{
+  // Killed/archived plans are filtered by the publisher, but the app must not
+  // DEPEND on that: a locally-pinned override or a stale payload can still
+  // carry one, and it would render with live kill/done links (QA swarm
+  // 2026-07-26, found by our own plans harness).
+  const planCards=(D.plans||[]).filter(p=>
+      !["killed","archived"].includes(String(p&&p.status||"")))
+    .map((p,pi)=>{
     const dir=p.direction==="exit"?"exit":"enter";
     const px=_pq(p.ticker);
     const done=p.status==="done";
@@ -723,8 +754,8 @@ function render(D){
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
         <b><span class="tk">$${esc(p.ticker)}</span> ${dir==="enter"?"⬇ entry":"⬆ exit"}${p.dollars?` · $${p.dollars}`:` · <span class="muted" style="font-weight:400">size undecided — timing only</span>`}</b>
         ${TOK?`<span style="flex:none;font-size:12px;display:flex;gap:12px">
-          <a href="#" class="plact" data-act="archived" data-k="${esc(p.ticker)}|${esc(p.created||"")}" style="color:var(--good);font-weight:600">✓ done</a>
-          ${done?"":`<a href="#" class="plact" data-act="killed" data-k="${esc(p.ticker)}|${esc(p.created||"")}" style="color:var(--bad)">✕ kill</a>`}</span>`:""}</div>
+          <a href="#" class="plact" data-act="archived" data-k="${esc(p.ticker)}|${esc(p.created||"")}|${pi}" style="color:var(--good);font-weight:600">✓ done</a>
+          ${done?"":`<a href="#" class="plact" data-act="killed" data-k="${esc(p.ticker)}|${esc(p.created||"")}|${pi}" style="color:var(--bad)">✕ kill</a>`}</span>`:""}</div>
       ${p.note?`<div class="muted" style="font-size:12px">${esc(p.note)}</div>`:""}
       ${slices}
       <div class="muted" style="font-size:11.5px;margin-top:6px">${done
@@ -860,9 +891,13 @@ function render(D){
 
   // FUND — consolidated into Home (Anthony 2026-07-24): positions + ledger
   // become collapsed expandable sections below the tiles; the Fund tab is gone
+  // An unpriced position falls back to COST upstream, which would render as a
+  // real market value with a flat +0.0% gain. Say "no quote" instead — an
+  // honest blank beats a fabricated zero (QA swarm 2026-07-26).
   const frows=rows.map(r=>`<tr><td>${tk(r.ticker)}</td>
-    <td class="num">${shfmt(r.shares)}</td><td class="num">${usd(r.value)}</td>
-    <td class="num">${pill(r.gain_pct)}</td></tr>`).join("");
+    <td class="num">${shfmt(r.shares)}</td><td class="num">${
+      r.priced===false?'<span class="muted">no quote</span>':usd(r.value)}</td>
+    <td class="num">${r.priced===false?'<span class="muted">—</span>':pill(r.gain_pct)}</td></tr>`).join("");
   const lots=(f.lots||[]).slice().reverse().map(l=>`<tr><td class="muted">${mdy(l.date)}</td>
     <td>${esc(l.kind)}</td><td>${tk(l.ticker)}</td>
     <td class="num">${shfmt(l.shares)}</td><td class="num">${usd(l.cost)}</td>
@@ -1027,16 +1062,26 @@ function render(D){
     try{
       const {text,sha}=await ghGet("Investing/entry_plans.json");
       const doc=JSON.parse(text);
-      const [tk,cr]=(b.dataset.k||"").split("|");
-      const p=(doc.plans||[]).find(x=>x.ticker===tk
-        &&String(x.created||"")===cr&&!["killed","archived"].includes(x.status));
+      const [tk,cr,ix]=(b.dataset.k||"").split("|");
+      // index disambiguates two plans on the same ticker+day (QA #14)
+      const live=(doc.plans||[]).filter(x=>!["killed","archived"].includes(x.status));
+      const byIx=live[+ix];
+      const p=(byIx&&byIx.ticker===tk&&String(byIx.created||"")===cr)?byIx
+        :live.find(x=>x.ticker===tk&&String(x.created||"")===cr);
       if(!p){b.textContent="not found — refresh";return}
       p.status=act;p[act]=new Date().toISOString().slice(0,10);
       await ghPut("Investing/entry_plans.json",
         JSON.stringify(doc,null,1)+"\n",sha,`app: ${act==="archived"?"done":"kill"} plan ${tk}`);
-      DATA.plans=(DATA.plans||[]).filter(x=>!(x.ticker===tk&&String(x.created||"")===cr));
+      DATA.plans=(DATA.plans||[]).filter((x,j)=>
+        !(x.ticker===tk&&String(x.created||"")===cr&&String(j)===String(ix)));
+      _savePlanOv();
+      // publish so the SERVER payload stops carrying it too (the holdings
+      // paths already do this; plans did not — QA swarm 2026-07-26)
+      fetch(`https://api.github.com/repos/${REPO}/actions/workflows/publish.yml/dispatches`,
+        {method:"POST",headers:ghH(),body:JSON.stringify({ref:"main"})}).catch(()=>{});
       render(DATA);
-    }catch(e){b.textContent=e.message}});
+    }catch(e){b._arm=0;                     // re-arm required after a failure
+      b.textContent=(act==="archived"?"✓ done":"✕ kill")+" — "+e.message;}});
   // tap a comparable's ticker inside a report → filter the library to it
   document.querySelectorAll(".wcomp").forEach(a=>a.onclick=ev=>{ev.preventDefault();
     const ws2=$("#wsearch");if(ws2){ws2.value=a.dataset.t;filterReports(a.dataset.t);}});
@@ -1121,22 +1166,25 @@ function sweepNewRow(rows,tRaw,sRaw,cRaw){
   return{ok:true,added:true};
 }
 function parseHoldings(text){
-  const head=[],rows=[];
+  const head=[],rows=[],tail=[];
   for(const line of text.split("\n")){
     if(!rows.length&&line.trim().startsWith("#")){head.push(line);continue;}
+    // comments BELOW the first holding used to be deleted by every save
+    // (QA swarm 2026-07-26) — keep them and write them back at the end
+    if(rows.length&&line.trim().startsWith("#")){tail.push(line);continue;}
     const p=line.split("#")[0].trim().split(/\s+/).filter(Boolean);
     if(!p.length) continue;
     const t=p[0].toUpperCase().replace(/^\$/,"");
     if(t&&t.length<=6) rows.push({t,s:p[1]||"",c:p[2]||""});
   }
-  return {head,rows};
+  return {head,rows,tail};
 }
 async function openShares(){
   const ed=$("#shed");
   ed.innerHTML='<div class="card muted">loading holdings…</div>';
   try{
     const {text,sha}=await ghGet("Investing/holdings.txt");
-    const {head,rows}=parseHoldings(text);
+    const {head,rows,tail}=parseHoldings(text);
     ed._head=head;ed._sha=sha;
     drawShares(ed,rows);
   }catch(e){ed.innerHTML=`<div class="card" style="color:var(--bad)">${esc(e.message)}</div>`}
@@ -1198,6 +1246,8 @@ function drawShares(ed,rows){
       const old={};(DATA.personal||[]).forEach(h=>old[h.ticker]=h);
       DATA.personal=ed._rows.map(r=>({...(old[r.t]||{ticker:r.t,quote:null,thesis:"",breaks:[]}),
         ticker:r.t,shares:r.s?num(r.s):null,cost:r.c?num(r.c):null}));
+      _saveBookOv();       // QA swarm 2026-07-26: without this a deleted
+                           // holding comes back as a ghost row on refresh
       render(DATA);
       $("#shmsg")&&($("#shmsg").textContent="saved ✓");
     }catch(e){
@@ -1464,7 +1514,13 @@ function filterReports(q){
   q=String(q||"").trim().toLowerCase();
   let shown=0;
   document.querySelectorAll(".wcard").forEach(c=>{
-    const hit=!q||(c.dataset.search||"").includes(q);
+    // A 1-2 letter ticker as a bare substring matches half the library
+    // ($V hits "NVDA", "AVGO"...). Short queries must match a WHOLE token
+    // (QA swarm 2026-07-26); longer ones keep the friendly substring search.
+    const src=(c.dataset.search||"");
+    const hit=!q||(q.length<=2
+      ? src.split(/[^a-z0-9.]+/).includes(q)
+      : src.includes(q));
     c.style.display=hit?"":"none";if(hit)shown++;});
   const none=$("#wnone");
   if(none){
@@ -1479,7 +1535,9 @@ async function queueWriteup(){
   const raw=((inp&&inp.value)||"").trim();
   if(!raw){if(m)m.textContent="type a ticker first, e.g. SOFI";return}
   const t=raw.toUpperCase().replace(/^\$/,"");
-  if(!/^[A-Z.]{1,6}$/.test(t)){if(m)m.textContent=`"${raw}" isn't a ticker (1-6 letters)`;return}
+  // must START with a letter; digits are legal in tickers (BRK.B, 3M-style
+  // foreign lines). "." and "....." used to pass (QA swarm 2026-07-26).
+  if(!/^[A-Z][A-Z0-9.]{0,5}$/.test(t)){if(m)m.textContent=`"${raw}" isn't a ticker`;return}
   if((DATA.writeups||{})[t]){if(m)m.textContent=t+" already has a report — search for it below";return}
   if(m)m.textContent="queuing…";
   try{
