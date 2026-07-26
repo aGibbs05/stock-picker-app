@@ -746,8 +746,13 @@ function render(D){
     const px=_pq(p.ticker);
     const done=p.status==="done";
     const slices=(p.slices||[]).map(s=>{
+      // A slice may pin its own side (plan_watch.slice_trips: a protective
+      // floor inside an exit plan trips BELOW). Measure the distance from the
+      // side that actually trips, or a level 33% away reads "in range now"
+      // (QA swarm 2026-07-26).
+      const side=s.trip||(dir==="enter"?"below":"above");
       const dist=(px!=null&&s.price)
-        ?(dir==="enter"?(px-s.price)/px:(s.price-px)/px)*100:null;
+        ?(side==="below"?(px-s.price)/px:(s.price-px)/px)*100:null;
       return `<div style="display:flex;gap:8px;align-items:baseline;margin-top:6px">
         <span class="${s.tripped?"good":"muted"}" style="flex:none;font-size:13px">${s.tripped?"✓":"○"}</span>
         <div style="flex:1;min-width:0"><b style="font-size:13px">$${s.price}</b>
