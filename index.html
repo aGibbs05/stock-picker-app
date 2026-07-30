@@ -1705,11 +1705,23 @@ async function tryUnlock(pass,remember){
     const D=await unlock(pass);
     if(remember) localStorage.setItem("mc_pass",pass);
     _lastRef=Date.now();
-    try{localStorage.setItem("mc_cache",JSON.stringify(D))}catch(e){}
+    // NOTHING CHANGED → DON'T REBUILD THE PAGE (QA swarm 2026-07-29). The
+    // payload only changes when a run publishes, once or twice a day, but every
+    // foreground after 60s used to re-render ~980KB of HTML regardless — which
+    // closed every card you had open, moved the page under you, and is the
+    // visible hitch. Compare BEFORE overwriting the cache, and set the stamp by
+    // hand on the skip path or "· refreshing…" sticks on screen forever.
+    const s=JSON.stringify(D);
+    const same=!!DATA&&s===localStorage.getItem("mc_cache");
+    try{localStorage.setItem("mc_cache",s)}catch(e){}
     $("#gate").style.display="none";$("#app").style.display="block";
     DATA=D;
-    render(D);
-    if(window.requestAnimationFrame)requestAnimationFrame(()=>goTab(CUR));
+    if(same){
+      $("#stamp").textContent="as of "+D.generated+" · updates with each run";
+    }else{
+      render(D);
+      if(window.requestAnimationFrame)requestAnimationFrame(()=>goTab(CUR));
+    }
   }catch(err){
     if(DATA){   // cached view already on screen — stay on it, note quietly
       $("#stamp").textContent=(DATA.generated?("as of "+DATA.generated):"")+
