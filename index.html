@@ -614,7 +614,13 @@ function render(D){
       const gen2=Date.parse(String(D.generated||"").replace(" ","T")+":00Z");
       if(gen2>pov.at)localStorage.removeItem("mc_plan_ov");
       else D.plans=pov.plans;
-    }else if(ov)localStorage.removeItem("mc_book_ov");
+    }
+    // NOTE (QA swarm 2026-07-29): this used to carry a trailing
+    // `else if(ov)localStorage.removeItem("mc_book_ov")` — the else of the PLAN
+    // test, deleting the BOOK pin. With no plan override present (the normal
+    // case) the very render that applied an edited share count also threw the
+    // pin away, so the old number came back on the next foreground. The pin
+    // retires on its own: newer payload above, 10-minute TTL otherwise.
   }catch(e){}
   $("#stamp").textContent="as of "+D.generated+" · updates with each run";
   const f=D.fund||{}, bm=f.bench_matched||{};
@@ -744,8 +750,11 @@ function render(D){
     // 2026-07-26). Fall back to any other quote the payload carries.
     const fr=((D.fund||{}).rows||[]).find(x=>x.ticker===t&&x.px!=null);
     if(fr)return fr.px;
-    const tr=(D.track||[]).slice().reverse().find(x=>x.ticker===t&&x.snap!=null);
-    return tr?tr.snap:null;};
+    // Never fall back to `track[].snap` (QA swarm 2026-07-29): that field is a
+    // graded-return OBJECT, not a price, so the distance became NaN, the
+    // "is it far away" test passed anyway, and a level 30%+ away printed
+    // "in range now" with no visible NaN. No quote is an honest blank.
+    return null;};
   // Killed/archived plans are filtered by the publisher, but the app must not
   // DEPEND on that: a locally-pinned override or a stale payload can still
   // carry one, and it would render with live kill/done links (QA swarm
