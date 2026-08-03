@@ -334,7 +334,9 @@ const FILES=[
   "TICKER | why you own it | break1; break2"],
  ["📅 Fund calendar","Investing/fund_calendar.json",
   "JSON list of {date, ticker, event, kind} — drives slate widening + gauntlet briefs"],
- ["🏛 13F managers","Investing/superinvestors.txt","Name | CIK (optional)"]];
+ ["🏛 13F managers","Investing/superinvestors.txt","Name | CIK (optional)"],
+ ["👀 Watchlist","Investing/watchlist.txt",
+  "one ticker per line · # comments · a new name with no report gets one queued"]];
 
 // ── theme: seeded from the phone's preference, manual toggle wins ──
 let THEME=localStorage.getItem("mc_theme")||
@@ -919,7 +921,7 @@ function render(D){
       <div id="wqmsg" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>`:""}
     ${wChips?`<div style="margin-bottom:4px">${wChips}</div>`:""}
     <div id="wlist">${wCards||_blank(D,"writeups","no reports yet — queue a ticker above and it arrives with the next chat session")}</div>
-    <div id="wnone" class="card" style="display:none"><p class="muted"></p></div>`;
+    <div id="wnone" class="card" style="display:none"></div>`;
   const _ws=$("#wsearch");if(_ws)_ws.oninput=()=>filterReports(_ws.value);
   const _wq=$("#wqgo");if(_wq)_wq.onclick=()=>queueWriteup();
   // (wcomp / whead / ntog handlers bind in the LATE wiring block — the Home
@@ -1017,7 +1019,7 @@ function render(D){
       <button class="bs fopen" data-p="${p}" data-n="${esc(n)}" style="margin-top:8px">Open editor</button>
       <div class="fed" data-p="${p}"></div></div>`).join("")
     :`<div class="card"><b>File editors</b>
-      <div class="muted" style="font-size:13px;margin-top:3px">Callers, thesis rubrics, the fund calendar and the 13F managers become editable right here once in-app editing is on — set the key above.</div></div>`;
+      <div class="muted" style="font-size:13px;margin-top:3px">Callers, thesis rubrics, the fund calendar, the 13F managers and the watchlist become editable right here once in-app editing is on — set the key above.</div></div>`;
   const remoteCard=TOK
     ?`<div class="card"><b>🕹 Remote control</b>
       <div class="muted" style="font-size:12.5px;margin-top:2px">kicks off the GitHub workflow — email + app data land in ~5-10 min</div>
@@ -1491,6 +1493,17 @@ async function saveOneShare(t){
   }catch(e){if(msg)msg.textContent=e.message}
 }
 
+// A name you just put on the watchlist is a name research should reach, so any
+// ticker that is NEW in this save and has no report yet gets one queued.
+// Returns the bit of the save message that says what was queued.
+async function queueNewWatchlist(before,after){
+  const had=qLines(before),wu=DATA.writeups||{},done=[];
+  const add=qLines(after).filter((t,i,a)=>a.indexOf(t)===i&&!had.includes(t)&&!wu[t]
+    &&/^[A-Z][A-Z0-9.]{0,5}$/.test(t));
+  for(const t of add){if(await queueTicker(t))done.push(t)}
+  return done.length?" — queued reports for "+done.join(", "):" — the next run reads it";
+}
+
 async function openFileEditor(path){
   // generic in-app editor for the github-editable config files (More tab):
   // load → textarea → Save (JSON files are validated before saving)
@@ -1499,7 +1512,7 @@ async function openFileEditor(path){
   box.innerHTML='<div class="muted" style="margin-top:8px">loading…</div>';
   try{
     const {text,sha}=await ghGet(path);
-    box._sha=sha;
+    box._sha=sha;box._prev=text;   // _prev = what was in the file before this edit
     box.innerHTML=`<textarea class="inp" rows="10" spellcheck="false"
       style="width:100%;margin-top:8px;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow-x:auto">${esc(text)}</textarea>
      <div style="display:flex;gap:8px;margin-top:8px">
@@ -1517,7 +1530,14 @@ async function openFileEditor(path){
       try{
         await ghPut(path,v,box._sha,"app: edit "+path.split("/").pop());
         const g=await ghGet(path);box._sha=g.sha;   // fresh sha for re-saves
-        ms.textContent="saved ✓ — the next run reads it";
+        let note=" — the next run reads it";
+        if(path==="Investing/watchlist.txt"){
+          // the save already landed: a queue failure must never look like a
+          // failed save, and must never show a raw HTTP error
+          try{note=await queueNewWatchlist(box._prev,v);box._prev=v}
+          catch(e2){note=" — but the new names couldn't be added to the report queue; queue them from Reports"}
+        }
+        ms.textContent="saved ✓"+note;
       }catch(e){ms.textContent=e.message}};
   }catch(e){
     box.innerHTML=`<div style="color:var(--bad);margin-top:8px;font-size:13px">${esc(e.message)}</div>`}
@@ -1557,7 +1577,11 @@ async function refreshAsks(){
 
 function filterReports(q){
   // letter-by-letter live filter over the report cards (ticker + company)
-  q=String(q||"").trim().toLowerCase();
+  // Strip a leading "$" BEFORE matching. Every card prints its ticker as
+  // "$NVDA", so that is exactly what gets typed — and without this it matched
+  // nothing (data-search holds "nvda nvidia"), the no-match state fired, and
+  // the app offered to queue a second report for a name it already covers.
+  q=String(q||"").trim().toLowerCase().replace(/^\$/,"");
   let shown=0;
   document.querySelectorAll(".wcard").forEach(c=>{
     // A 1-2 letter ticker as a bare substring matches half the library
@@ -1571,9 +1595,49 @@ function filterReports(q){
   const none=$("#wnone");
   if(none){
     none.style.display=(q&&!shown)?"":"none";
-    const p=none.querySelector("p");
-    if(p)p.textContent=`no report matches "${q}" — queue it above and it arrives next chat session`;
+    if(q&&!shown){
+      // searching for a name you don't have a report on IS the request for one
+      const t=q.toUpperCase();
+      // Same shape test the queue box uses (BRK.B is a ticker; a letters-only
+      // 5-char test rejected it), and the SAME already-has-a-report guard —
+      // without that, a miss on a covered name offered a duplicate report.
+      const offer=TOK&&/^[A-Z][A-Z0-9.]{0,5}$/.test(t)
+        &&!(DATA.writeups||{})[t]
+        &&!(DATA.writeup_queue||[]).map(x=>String(x).toUpperCase()).includes(t);
+      none.innerHTML=`<p class="muted">no report matches "${esc(q)}" — queue it above and it arrives next chat session</p>`
+        +(offer?`<button class="bp wqadd" style="margin-top:8px">Add ${esc(t)} to queue</button>
+         <div class="muted wqamsg" style="font-size:12.5px;margin-top:6px"></div>`:"");
+      const b=offer&&none.querySelector(".wqadd");
+      // TWO TAPS, like every other write-triggering button in this app. No test
+      // can tell the ticker SOLV from the word "solar" — both are letters — so
+      // the second tap is the guard against a stray search writing a junk line
+      // into the queue that he then has to remove from GitHub by hand.
+      if(b){let armed=false;b.onclick=async()=>{
+        if(!armed){armed=true;b.textContent="tap again to queue "+t;return}
+        const am=none.querySelector(".wqamsg");if(am)am.textContent="queuing…";
+        try{
+          const added=await queueTicker(t);
+          none.innerHTML=`<p class="muted">${esc(t)}${added
+            ?" queued ✓ — written free in the next chat session"
+            :" is already queued"}</p>`;
+          render(DATA);   // so the "queued" chip appears now, not next render
+        }catch(e){if(am)am.textContent="couldn't queue "+t+" right now — try again in a moment"}
+      };}
+    }
   }
+}
+
+// the ONE place a ticker gets appended to the write-up queue — the Reports box,
+// the no-results button and the watchlist auto-queue all land here. Returns
+// false (without writing) when the ticker is already sitting in the queue.
+const qLines=s=>String(s||"").split(/\r?\n/)
+  .map(l=>l.split("#")[0].trim().toUpperCase().replace(/^\$/,"")).filter(Boolean);
+async function queueTicker(t){
+  const {text,sha}=await ghGet("Investing/writeup_queue.txt");
+  if(qLines(text).includes(t))return false;
+  await ghPut("Investing/writeup_queue.txt",text.replace(/\s*$/,"\n")+t+"\n",sha,"app: queue write-up "+t);
+  (DATA.writeup_queue=DATA.writeup_queue||[]).push(t);
+  return true;
 }
 
 async function queueWriteup(){
@@ -1587,11 +1651,7 @@ async function queueWriteup(){
   if((DATA.writeups||{})[t]){if(m)m.textContent=t+" already has a report — search for it below";return}
   if(m)m.textContent="queuing…";
   try{
-    const {text,sha}=await ghGet("Investing/writeup_queue.txt");
-    const have=text.split(/\r?\n/).map(l=>l.split("#")[0].trim().toUpperCase().replace(/^\$/,"")).filter(Boolean);
-    if(have.includes(t)){if(m)m.textContent=t+" is already queued";return}
-    await ghPut("Investing/writeup_queue.txt",text.replace(/\s*$/,"\n")+t+"\n",sha,"app: queue write-up "+t);
-    (DATA.writeup_queue=DATA.writeup_queue||[]).push(t);
+    if(!await queueTicker(t)){if(m)m.textContent=t+" is already queued";return}
     if(inp)inp.value="";
     render(DATA);
     const m2=$("#wqmsg");if(m2)m2.textContent="queued ✓ — written free in the next chat session";
