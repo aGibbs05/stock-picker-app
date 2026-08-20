@@ -795,7 +795,11 @@ function render(D){
       <div class="muted" style="font-size:11.5px;margin-top:6px">${done
         ?"complete — every level hit"
         :`fallback ${esc(p.fallback||"—")} — unfilled slices fire a decision alert${p.fallback_fired?` (FIRED ${esc(p.fallback_fired)})`:""}`}</div></div>`;}).join("");
-  const pqItems=(D.plan_queue||[]).map(x=>`<li style="font-size:12.5px">${esc(x)} <span class="muted">— sliced plan arrives next chat session</span></li>`).join("");
+  // Each queued request carries a ✕ (Anthony 2026-08-20: "theres no way for
+  // me to take that down") — queue lines were append-only from the phone, so
+  // a request he changed his mind on sat until a chat session drained it.
+  const pqItems=(D.plan_queue||[]).map((x,qi)=>`<li style="font-size:12.5px">${esc(x)} <span class="muted">— sliced plan arrives next chat session</span>${
+    TOK?` <a href="#" class="pqrm" data-line="${esc(x)}" data-i="${qi}" style="color:var(--bad);font-size:12px;margin-left:6px">✕ remove</a>`:""}</li>`).join("");
   // collapsed by default — a clean tappable header that expands the form via
   // the shared .fx/.whead accordion (same mechanism as the fund sections),
   // so the Book tab isn't cluttered by an always-open form (Anthony 2026-07-24)
@@ -1091,6 +1095,23 @@ function render(D){
       ["plt","pla","pln"].forEach(id=>{const e=$("#"+id);if(e)e.value=""});
       if(m)m.textContent="queued ✓ — the sliced plan lands next chat session";
     }catch(e){if(m)m.textContent=e.message}};
+  // remove a QUEUED plan request (arm-twice like every destructive tap)
+  document.querySelectorAll(".pqrm").forEach(b=>b.onclick=async ev=>{
+    ev.preventDefault();
+    if(b._arm!==1){b._arm=1;b.textContent="tap again to remove";return}
+    b.textContent="removing…";
+    try{
+      const {text,sha}=await ghGet("Investing/plan_queue.txt");
+      const want=b.dataset.line;
+      const lines=text.split("\n");
+      const at=lines.findIndex(l=>l.trim()===want.trim());
+      if(at<0){b.textContent="already gone — refresh";return}
+      lines.splice(at,1);
+      await ghPut("Investing/plan_queue.txt",lines.join("\n"),sha,
+        "app: remove plan request "+want.split(" ")[0]);
+      DATA.plan_queue=(DATA.plan_queue||[]).filter(l=>l.trim()!==want.trim());
+      render(DATA);
+    }catch(e){b._arm=0;b.textContent="✕ remove — "+e.message;}});
   document.querySelectorAll(".plact").forEach(b=>b.onclick=async ev=>{
     ev.preventDefault();
     const act=b.dataset.act==="archived"?"archived":"killed";
